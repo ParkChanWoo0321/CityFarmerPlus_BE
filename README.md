@@ -5,9 +5,9 @@
 
 ---
 
-<img width="1458" height="1170" alt="Image" src="https://github.com/user-attachments/assets/f45f5d54-4980-4ba4-aae5-ad3eca3280bc" />
-
 ## 📌 프로젝트 소개
+
+<img width="1458" height="1170" alt="Image" src="https://github.com/user-attachments/assets/f45f5d54-4980-4ba4-aae5-ad3eca3280bc" />
 
 **도시농부플러스**는 충청북도에서 운영 중인 **충북형 도시농부 사업**의 신청, 모집, 매칭 과정을 디지털화한 서비스입니다.
 
