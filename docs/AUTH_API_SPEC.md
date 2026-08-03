@@ -1,9 +1,9 @@
 # CityFarmerPlus 회원·인증 API 명세서
 
-- 문서 버전: 1.0
-- 작성일: 2026-07-26
+- 문서 버전: 1.1
+- 작성일: 2026-08-03
 - 구현 기준 브랜치: `backend-1`
-- 적용 범위: 회원가입, 아이디 중복 확인, 로그인, JWT 인증, 내 정보 조회, 로그아웃
+- 적용 범위: 회원가입, 담당자 계정 발급, 아이디 중복 확인, 로그인, JWT 인증, 내 정보 조회, 로그아웃
 
 ## 1. 공통 사항
 
@@ -21,6 +21,7 @@ Postman에서는 다음 환경 변수를 사용하는 것을 권장한다.
 |---|---|
 | `baseUrl` | `http://localhost:8080` |
 | `accessToken` | 로그인 응답의 `accessToken` |
+| `adminProvisioningKey` | 담당자 계정 발급 전용 키 |
 
 ### 1.2 요청 및 응답 형식
 
@@ -65,6 +66,7 @@ Authorization: Bearer {{accessToken}}
 | 기능 | Method | URL | 인증 | 성공 상태 |
 |---|---|---|---|---|
 | 회원가입 | `POST` | `/api/auth/signup` | 불필요 | `201 Created` |
+| 담당자 계정 발급 | `POST` | `/api/internal/center-admins` | 발급 전용 키 | `201 Created` |
 | 아이디 중복 확인 | `GET` | `/api/auth/check-id` | 불필요 | `200 OK` |
 | 로그인 | `POST` | `/api/auth/login` | 불필요 | `200 OK` |
 | 내 정보 조회 | `GET` | `/api/auth/me` | Bearer JWT | `200 OK` |
@@ -338,8 +340,10 @@ HTTP/1.1 204 No Content
 | `JWT_SECRET` | O | UTF-8 기준 32바이트 이상의 JWT 서명 키 |
 | `JWT_ISSUER` | 선택 | JWT 발급자 |
 | `JWT_ACCESS_TOKEN_EXPIRATION` | 선택 | Spring Duration 형식, 기본값 `1h` |
+| `ADMIN_PROVISIONING_ENABLED` | 선택 | 담당자 계정 발급 활성화 여부, 기본값 `false` |
+| `ADMIN_PROVISIONING_KEY` | 활성화 시 O | UTF-8 기준 32바이트 이상의 담당자 발급 전용 키 |
 
-운영 환경에서는 로컬 개발용 JWT 키를 사용하지 않고 충분히 긴 무작위 비밀키를 별도로 주입해야 한다.
+운영 환경에서는 로컬 개발용 키를 사용하지 않고 충분히 긴 무작위 비밀키를 별도로 주입해야 한다. `JWT_SECRET`과 `ADMIN_PROVISIONING_KEY`는 서로 다른 값을 사용한다.
 
 ## 10. 회원 테이블 논리 구조
 
@@ -365,20 +369,84 @@ HTTP/1.1 204 No Content
 5. `GET {{baseUrl}}/api/auth/me`에 Bearer Token을 설정해 인증을 확인한다.
 6. `POST {{baseUrl}}/api/auth/logout` 호출 후 클라이언트에 저장한 토큰을 삭제한다.
 
-## 12. 현재 범위 밖 또는 미구현 기능
+담당자 계정은 다음 순서로 생성한다.
+
+1. `.env`에서 `ADMIN_PROVISIONING_ENABLED=true`로 설정한다.
+2. `ADMIN_PROVISIONING_KEY`에 32바이트 이상의 별도 무작위 키를 설정한다.
+3. 애플리케이션을 재시작한다.
+4. Postman으로 `POST {{baseUrl}}/api/internal/center-admins`를 호출한다.
+5. 계정 생성 후 발급 기능을 다시 비활성화하고 애플리케이션을 재시작한다.
+6. 생성한 담당자는 기존 로그인 API를 이용한다.
+
+## 12. 담당자 계정 발급
+
+담당자는 공개 회원가입으로 생성할 수 없으며, UI도 제공하지 않는다. 백엔드 개발자가 별도의 발급 키를 이용해 Postman으로만 생성한다. 담당자는 충북 전체 시·군을 담당하므로 관할 지역은 요청받지 않는다.
+
+### 12.1 요청
+
+```http
+POST /api/internal/center-admins
+Content-Type: application/json
+X-Admin-Provisioning-Key: {{adminProvisioningKey}}
+```
+
+```json
+{
+  "loginId": "center_admin01",
+  "password": "admin-password-123",
+  "name": "충북 담당자"
+}
+```
+
+| 필드 | 타입 | 필수 | 제약 조건 |
+|---|---|---|---|
+| `loginId` | String | O | 4~30자, 영문 소문자·숫자·밑줄만 허용 |
+| `password` | String | O | 12~64자이며 UTF-8 기준 72바이트 이하 |
+| `name` | String | O | 공백만 입력할 수 없음, 최대 50자 |
+
+요청에서 `userType`과 `accountStatus`는 받지 않는다. 서버가 항상 `CENTER_ADMIN`, `ACTIVE`로 설정하며 비밀번호는 BCrypt로 암호화한다.
+
+### 12.2 성공 응답
+
+```http
+HTTP/1.1 201 Created
+```
+
+```json
+{
+  "id": 3,
+  "loginId": "center_admin01",
+  "name": "충북 담당자",
+  "userType": "CENTER_ADMIN",
+  "accountStatus": "ACTIVE"
+}
+```
+
+계정 생성 응답에서는 JWT를 발급하지 않는다. 생성된 담당자는 `POST /api/auth/login`으로 로그인해 `role=CENTER_ADMIN` JWT를 발급받는다.
+
+### 12.3 오류 응답
+
+| 상태 | 코드 | 발생 조건 |
+|---|---|---|
+| `400` | `VALIDATION_ERROR` | 입력값 누락 또는 형식·길이 위반 |
+| `400` | `INVALID_REQUEST` | 요청 JSON이 올바르지 않음 |
+| `401` | `INVALID_PROVISIONING_KEY` | 발급 키 누락 또는 불일치 |
+| `403` | `PROVISIONING_DISABLED` | 담당자 계정 발급 기능이 비활성화됨 |
+| `409` | `DUPLICATE_LOGIN_ID` | 이미 사용 중인 아이디 |
+
+키 누락과 잘못된 키는 동일한 오류로 처리한다. 발급 키는 JWT 키나 DB 비밀번호와 재사용하지 않으며 Git, 요청 로그, 애플리케이션 로그에 기록하지 않는다.
+
+## 13. 현재 범위 밖 또는 미구현 기능
 
 다음 기능은 프로젝트 요구사항에는 포함되어 있지만 현재 인증 API 구현에는 포함되지 않았다.
 
-- 담당자 계정 생성 전용 API
 - Refresh Token과 서버 측 강제 로그아웃
 - 회원 승인 및 교육 이수 인증
 - 이수증 제출·반려·재제출·과거 파일 보관
 - 농가 소유 증빙 제출 및 담당자 승인
 - 회원 탈퇴 처리
 - 사용자 정보 수정 및 비밀번호 변경
-- 역할별 세부 API 접근 제어
-
-담당자는 공개 회원가입으로 생성할 수 없다. 담당자 계정을 Postman으로 생성하려면 별도의 보호된 담당자 생성 API를 추가로 구현해야 한다.
+- 역할별 세부 업무 API 접근 제어
 
 추가로 현재 구현에는 다음 기술적 제한이 있다.
 

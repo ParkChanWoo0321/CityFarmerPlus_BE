@@ -68,6 +68,23 @@ public class User {
             throw new IllegalArgumentException("담당자는 공개 회원가입으로 생성할 수 없습니다.");
         }
 
+        return create(loginId, encodedPassword, name, userType);
+    }
+
+    public static User registerCenterAdmin(
+            String loginId,
+            String encodedPassword,
+            String name
+    ) {
+        return create(loginId, encodedPassword, name, UserType.CENTER_ADMIN);
+    }
+
+    private static User create(
+            String loginId,
+            String encodedPassword,
+            String name,
+            UserType userType
+    ) {
         User user = new User();
         user.loginId = loginId;
         user.password = encodedPassword;
