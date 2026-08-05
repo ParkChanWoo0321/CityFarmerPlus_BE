@@ -130,6 +130,18 @@ public class FarmProfile {
         return profile;
     }
 
+    public boolean canSubmitOwnershipDocuments() {
+        return status == FarmProfileStatus.DRAFT
+                || status == FarmProfileStatus.REJECTED;
+    }
+
+    public void markOwnershipReviewPending() {
+        if (!canSubmitOwnershipDocuments()) {
+            throw new IllegalStateException("현재 상태에서는 농가 소유 증빙을 제출할 수 없습니다.");
+        }
+        status = FarmProfileStatus.PENDING_REVIEW;
+    }
+
     public enum FarmProfileStatus {
         DRAFT,
         PENDING_REVIEW,
