@@ -35,6 +35,8 @@ public class SecurityConfig {
                 // 회원가입/로그인/중복확인은 토큰이 없는 상태에서도 호출 가능해야 하므로 permitAll
                 .requestMatchers("/api/auth/signup", "/api/auth/login", "/api/auth/check-id").permitAll()
                 .requestMatchers("/error").permitAll()
+                // 도시농부 전용 API는 userType이 URBAN_FARMER인 토큰만 접근 가능
+                .requestMatchers("/api/urban-farmer/**").hasRole("URBAN_FARMER")
                 // 그 외(예: /api/auth/me, /api/auth/logout)는 유효한 토큰이 있어야 접근 가능
                 .anyRequest().authenticated()
             )
