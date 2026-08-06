@@ -30,8 +30,6 @@ public class AuthService {
         return userRepository.save(user);
     }
 
-    // 세션 때와 로직이 완전히 동일하다 — "아이디/비밀번호가 맞는 사용자를 찾아서 돌려준다"는 역할은 안 바뀜.
-    // 달라지는 건 "찾은 다음에 뭘 하느냐"인데, 그건 이제 Controller가 토큰을 발급하는 방식으로 처리한다.
     public User login(LoginRequest request) {
         User user = userRepository.findByLoginId(request.getLoginId())
                 .orElseThrow(() -> new IllegalArgumentException("아이디 또는 비밀번호가 일치하지 않습니다."));

@@ -29,12 +29,7 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
-
-            // ▼▼▼ 세션과 가장 크게 달라지는 부분 ▼▼▼
-            // "이제부터 서버는 세션을 아예 만들지도, 사용하지도 않는다"는 선언.
-            // 이걸 켜두면 Spring Security가 더 이상 JSESSIONID 쿠키를 발급하지 않는다.
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            // ▲▲▲ ▲▲▲
 
             .authorizeHttpRequests(auth -> auth
                 // 회원가입/로그인/중복확인은 토큰이 없는 상태에서도 호출 가능해야 하므로 permitAll

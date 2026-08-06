@@ -14,8 +14,6 @@ import java.util.Date;
 @Component
 public class JwtTokenProvider {
 
-    // application.properties의 jwt.secret 값을 그대로 주입받는다.
-    // 이 비밀키로 서명하기 때문에, 이 값을 모르는 사람은 절대 유효한 토큰을 위조할 수 없다.
     private final SecretKey secretKey;
     private final long expirationMillis;
 
@@ -37,7 +35,7 @@ public class JwtTokenProvider {
                 .claim("userType", user.getUserType().name())    // 커스텀 정보 추가 (도시농부/농가/중개센터)
                 .issuedAt(now)
                 .expiration(expiry)
-                .signWith(secretKey)                              // 여기서 서버만 아는 키로 서명이 이루어짐
+                .signWith(secretKey)
                 .compact();                                       // 최종적으로 "eyJhbGci..." 형태의 문자열로 변환
     }
 
