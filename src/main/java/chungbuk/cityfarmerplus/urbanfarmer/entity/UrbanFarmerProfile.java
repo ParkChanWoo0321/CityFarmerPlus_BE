@@ -42,4 +42,13 @@ public class UrbanFarmerProfile {
 
     @Column(length = 500)
     private String introduction;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private EducationStatus educationStatus = EducationStatus.NOT_COMPLETED;
+
+    public enum EducationStatus {
+        NOT_COMPLETED, APPLICABLE, CERTIFICATE_REGISTERED, COMPLETED
+    }
 }
