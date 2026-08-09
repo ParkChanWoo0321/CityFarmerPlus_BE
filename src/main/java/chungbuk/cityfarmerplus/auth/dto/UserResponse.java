@@ -1,20 +1,22 @@
 package chungbuk.cityfarmerplus.auth.dto;
 
 import chungbuk.cityfarmerplus.auth.entity.User;
-import lombok.Getter;
 
-@Getter
-public class UserResponse {
+public record UserResponse(
+        Long id,
+        String loginId,
+        String name,
+        User.UserType userType,
+        User.AccountStatus accountStatus
+) {
 
-    private final Long id;
-    private final String loginId;
-    private final String name;
-    private final User.UserType userType;
-
-    public UserResponse(User user) {
-        this.id = user.getId();
-        this.loginId = user.getLoginId();
-        this.name = user.getName();
-        this.userType = user.getUserType();
+    public static UserResponse from(User user) {
+        return new UserResponse(
+                user.getId(),
+                user.getLoginId(),
+                user.getName(),
+                user.getUserType(),
+                user.getAccountStatus()
+        );
     }
 }

@@ -43,6 +43,13 @@ public class UrbanFarmerProfile {
     @Column(length = 500)
     private String introduction;
 
+    @Column(nullable = false)
+    private boolean farmBusinessRegistered;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean eligibilityVerified = false;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default

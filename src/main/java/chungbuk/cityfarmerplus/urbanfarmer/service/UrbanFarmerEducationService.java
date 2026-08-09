@@ -21,7 +21,7 @@ public class UrbanFarmerEducationService {
         return urbanFarmerProfileRepository.save(profile);
     }
 
-    // 지금은 승인 절차 없이 바로 완료 처리. 추후 중개센터 관리자 기능 추가 시 승인 절차를 거치도록 변경 예정.
+    // 관리자 승인(admin.controller.AdminUrbanFarmerController)을 통해서만 호출된다.
     public UrbanFarmerProfile completeEducation(Long userId) {
         UrbanFarmerProfile profile = findProfile(userId);
         profile.setEducationStatus(UrbanFarmerProfile.EducationStatus.COMPLETED);

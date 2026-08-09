@@ -1,12 +1,10 @@
-package chungbuk.cityfarmerplus.auth.dto;
+package chungbuk.cityfarmerplus.admin.dto;
 
-import chungbuk.cityfarmerplus.auth.entity.User;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-public record SignupRequest(
+public record CenterAdminProvisioningRequest(
         @NotBlank(message = "아이디는 필수입니다.")
         @Pattern(
                 regexp = "^[a-z0-9_]{4,30}$",
@@ -20,9 +18,6 @@ public record SignupRequest(
 
         @NotBlank(message = "이름은 필수입니다.")
         @Size(max = 50, message = "이름은 50자 이하여야 합니다.")
-        String name,
-
-        @NotNull(message = "사용자 유형은 필수입니다.")
-        User.UserType userType
+        String name
 ) {
 }

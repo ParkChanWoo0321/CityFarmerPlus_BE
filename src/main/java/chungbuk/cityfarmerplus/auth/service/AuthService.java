@@ -1,52 +1,98 @@
 package chungbuk.cityfarmerplus.auth.service;
 
+import chungbuk.cityfarmerplus.auth.dto.LoginIdAvailabilityResponse;
 import chungbuk.cityfarmerplus.auth.dto.LoginRequest;
 import chungbuk.cityfarmerplus.auth.dto.SignupRequest;
+import chungbuk.cityfarmerplus.auth.dto.UserResponse;
 import chungbuk.cityfarmerplus.auth.entity.User;
+import chungbuk.cityfarmerplus.auth.exception.AuthException;
 import chungbuk.cityfarmerplus.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    public User signup(SignupRequest request) {
-        if (userRepository.existsByLoginId(request.getLoginId())) {
-            throw new IllegalArgumentException("이미 사용 중인 아이디입니다.");
+    @Transactional
+    public UserResponse signup(SignupRequest request) {
+        if (request.userType() == User.UserType.CENTER_ADMIN) {
+            throw AuthException.managerSignupNotAllowed();
         }
 
-        User user = User.builder()
-                .loginId(request.getLoginId())
-                .password(passwordEncoder.encode(request.getPassword()))
-                .name(request.getName())
-                .userType(request.getUserType())
-                .build();
-
-        return userRepository.save(user);
-    }
-
-    public User login(LoginRequest request) {
-        User user = userRepository.findByLoginId(request.getLoginId())
-                .orElseThrow(() -> new IllegalArgumentException("아이디 또는 비밀번호가 일치하지 않습니다."));
-
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new IllegalArgumentException("아이디 또는 비밀번호가 일치하지 않습니다.");
+        String loginId = normalizeLoginId(request.loginId());
+        if (userRepository.existsByLoginIdIgnoreCase(loginId)) {
+            throw AuthException.duplicateLoginId();
         }
 
-        return user;
+        User user = User.register(
+                loginId,
+                passwordEncoder.encode(request.password()),
+                request.name().trim(),
+                request.userType()
+        );
+
+        try {
+            return UserResponse.from(userRepository.saveAndFlush(user));
+        } catch (DataIntegrityViolationException exception) {
+            throw AuthException.duplicateLoginId();
+        }
     }
 
-    public User getById(Long id) {
-        return userRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+    public LoginResult login(LoginRequest request) {
+        String loginId = normalizeLoginId(request.loginId());
+        User user = userRepository.findByLoginIdIgnoreCase(loginId)
+                .orElseThrow(AuthException::invalidCredentials);
+
+        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
+            throw AuthException.invalidCredentials();
+        }
+        if (!user.isActive()) {
+            throw AuthException.inactiveAccount();
+        }
+
+        return new LoginResult(
+                user.getId(),
+                user.getUserType(),
+                UserResponse.from(user)
+        );
     }
 
-    public boolean isLoginIdAvailable(String loginId) {
-        return !userRepository.existsByLoginId(loginId);
+    public UserResponse getById(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(AuthException::userNotFound);
+        if (!user.isActive()) {
+            throw AuthException.inactiveAccount();
+        }
+        return UserResponse.from(user);
+    }
+
+    public LoginIdAvailabilityResponse checkLoginIdAvailability(String loginId) {
+        String normalizedLoginId = normalizeLoginId(loginId);
+        boolean available = !userRepository.existsByLoginIdIgnoreCase(normalizedLoginId);
+        return new LoginIdAvailabilityResponse(normalizedLoginId, available);
+    }
+
+    private String normalizeLoginId(String loginId) {
+        if (loginId == null) {
+            return "";
+        }
+        return loginId.trim().toLowerCase(Locale.ROOT);
+    }
+
+    public record LoginResult(
+            Long userId,
+            User.UserType userType,
+            UserResponse user
+    ) {
     }
 }

@@ -1,15 +1,17 @@
 package chungbuk.cityfarmerplus.auth.dto;
 
-import lombok.Getter;
+public record TokenResponse(
+        String accessToken,
+        String tokenType,
+        long expiresInSeconds,
+        UserResponse user
+) {
 
-@Getter
-public class TokenResponse {
-
-    private final String accessToken;
-    private final UserResponse user;
-
-    public TokenResponse(String accessToken, UserResponse user) {
-        this.accessToken = accessToken;
-        this.user = user;
+    public static TokenResponse bearer(
+            String accessToken,
+            long expiresInSeconds,
+            UserResponse user
+    ) {
+        return new TokenResponse(accessToken, "Bearer", expiresInSeconds, user);
     }
 }

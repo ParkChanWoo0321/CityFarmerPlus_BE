@@ -24,4 +24,6 @@ public class UrbanFarmerProfileRequest {
 
     @Size(max = 500, message = "자기소개는 500자를 초과할 수 없습니다.")
     private String introduction;
+
+    private boolean farmBusinessRegistered;
 }

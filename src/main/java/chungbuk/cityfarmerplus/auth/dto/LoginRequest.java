@@ -1,14 +1,12 @@
 package chungbuk.cityfarmerplus.auth.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import lombok.Getter;
 
-@Getter
-public class LoginRequest {
+public record LoginRequest(
+        @NotBlank(message = "아이디는 필수입니다.")
+        String loginId,
 
-    @NotBlank(message = "아이디는 필수입니다.")
-    private String loginId;
-
-    @NotBlank(message = "비밀번호는 필수입니다.")
-    private String password;
+        @NotBlank(message = "비밀번호는 필수입니다.")
+        String password
+) {
 }

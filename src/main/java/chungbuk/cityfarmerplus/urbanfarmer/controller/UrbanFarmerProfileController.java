@@ -22,14 +22,14 @@ public class UrbanFarmerProfileController {
             @Valid @RequestBody UrbanFarmerProfileRequest request,
             Authentication authentication
     ) {
-        Long userId = (Long) authentication.getPrincipal();
+        Long userId = Long.valueOf(authentication.getName());
         UrbanFarmerProfile profile = urbanFarmerProfileService.register(userId, request);
         return ResponseEntity.ok(new UrbanFarmerProfileResponse(profile));
     }
 
     @GetMapping
     public ResponseEntity<UrbanFarmerProfileResponse> getMyProfile(Authentication authentication) {
-        Long userId = (Long) authentication.getPrincipal();
+        Long userId = Long.valueOf(authentication.getName());
         UrbanFarmerProfile profile = urbanFarmerProfileService.getMyProfile(userId);
         return ResponseEntity.ok(new UrbanFarmerProfileResponse(profile));
     }
@@ -39,7 +39,7 @@ public class UrbanFarmerProfileController {
             @Valid @RequestBody UrbanFarmerProfileRequest request,
             Authentication authentication
     ) {
-        Long userId = (Long) authentication.getPrincipal();
+        Long userId = Long.valueOf(authentication.getName());
         UrbanFarmerProfile profile = urbanFarmerProfileService.updateMyProfile(userId, request);
         return ResponseEntity.ok(new UrbanFarmerProfileResponse(profile));
     }

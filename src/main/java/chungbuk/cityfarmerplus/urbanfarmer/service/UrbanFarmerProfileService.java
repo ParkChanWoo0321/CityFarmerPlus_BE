@@ -23,6 +23,10 @@ public class UrbanFarmerProfileService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
 
+        if (user.getUserType() != User.UserType.URBAN_FARMER) {
+            throw new IllegalArgumentException("도시농부 계정만 프로필을 등록할 수 있습니다.");
+        }
+
         UrbanFarmerProfile profile = UrbanFarmerProfile.builder()
                 .user(user)
                 .preferredRegion(request.getPreferredRegion())
@@ -31,6 +35,7 @@ public class UrbanFarmerProfileService {
                 .canTravel(request.isCanTravel())
                 .experienceCount(request.getExperienceCount())
                 .introduction(request.getIntroduction())
+                .farmBusinessRegistered(request.isFarmBusinessRegistered())
                 .build();
 
         return urbanFarmerProfileRepository.save(profile);
@@ -50,7 +55,14 @@ public class UrbanFarmerProfileService {
         profile.setCanTravel(request.isCanTravel());
         profile.setExperienceCount(request.getExperienceCount());
         profile.setIntroduction(request.getIntroduction());
+        profile.setFarmBusinessRegistered(request.isFarmBusinessRegistered());
 
+        return urbanFarmerProfileRepository.save(profile);
+    }
+
+    public UrbanFarmerProfile verifyEligibility(Long userId) {
+        UrbanFarmerProfile profile = getMyProfile(userId);
+        profile.setEligibilityVerified(true);
         return urbanFarmerProfileRepository.save(profile);
     }
 }

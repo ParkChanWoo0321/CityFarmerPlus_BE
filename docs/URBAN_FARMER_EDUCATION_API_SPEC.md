@@ -33,11 +33,12 @@ Authorization: Bearer {{accessToken}}
 
 ```json
 {
+  "code": "오류 코드",
   "message": "오류 설명"
 }
 ```
 
-`401`·`403` 오류는 이 형식을 따르지 않는다. 자세한 내용은 6장을 참고한다.
+인증(`401`)·인가(`403`) 오류는 `GlobalExceptionHandler`가 아니라 `SecurityConfig`가 직접 같은 `{ code, message }` 형식으로 응답한다. 자세한 내용은 6장을 참고한다.
 
 ## 2. API 목록
 
@@ -70,16 +71,17 @@ HTTP/1.1 200 OK
 
 ### 3.3 오류 응답
 
-| 상태 | 발생 조건 |
-|---|---|
-| `400` | 도시농부 프로필을 아직 등록하지 않은 계정으로 조회 |
-| `401` | JWT 누락, 만료 또는 위조 |
-| `403` | `URBAN_FARMER`가 아닌 계정의 JWT로 접근 |
+| 상태 | 코드 | 발생 조건 |
+|---|---|---|
+| `400` | `BAD_REQUEST` | 도시농부 프로필을 아직 등록하지 않은 계정으로 조회 |
+| `401` | `UNAUTHORIZED` | JWT 누락, 만료 또는 위조 |
+| `403` | `ACCESS_DENIED` | `URBAN_FARMER`가 아닌 계정의 JWT로 접근 |
 
 프로필 미등록 예시:
 
 ```json
 {
+  "code": "BAD_REQUEST",
   "message": "먼저 프로필을 등록해주세요."
 }
 ```
@@ -109,11 +111,11 @@ HTTP/1.1 200 OK
 
 ### 4.3 오류 응답
 
-| 상태 | 발생 조건 |
-|---|---|
-| `400` | 도시농부 프로필을 아직 등록하지 않은 계정으로 호출 |
-| `401` | JWT 누락, 만료 또는 위조 |
-| `403` | `URBAN_FARMER`가 아닌 계정의 JWT로 접근 |
+| 상태 | 코드 | 발생 조건 |
+|---|---|---|
+| `400` | `BAD_REQUEST` | 도시농부 프로필을 아직 등록하지 않은 계정으로 호출 |
+| `401` | `UNAUTHORIZED` | JWT 누락, 만료 또는 위조 |
+| `403` | `ACCESS_DENIED` | `URBAN_FARMER`가 아닌 계정의 JWT로 접근 |
 
 이전 `educationStatus` 값과 무관하게 항상 `CERTIFICATE_REGISTERED`로 덮어쓴다. 상태 전이 순서(예: `NOT_COMPLETED`에서만 호출 가능)는 검증하지 않는다.
 
@@ -142,18 +144,22 @@ HTTP/1.1 200 OK
 
 ### 5.3 오류 응답
 
-| 상태 | 발생 조건 |
-|---|---|
-| `400` | 도시농부 프로필을 아직 등록하지 않은 계정으로 호출 |
-| `401` | JWT 누락, 만료 또는 위조 |
-| `403` | `URBAN_FARMER`가 아닌 계정의 JWT로 접근 |
+| 상태 | 코드 | 발생 조건 |
+|---|---|---|
+| `400` | `BAD_REQUEST` | 도시농부 프로필을 아직 등록하지 않은 계정으로 호출 |
+| `401` | `UNAUTHORIZED` | JWT 누락, 만료 또는 위조 |
+| `403` | `ACCESS_DENIED` | `URBAN_FARMER`가 아닌 계정의 JWT로 접근 |
 
 이전 `educationStatus` 값과 무관하게 항상 `COMPLETED`로 덮어쓴다. 수료증 등록(`CERTIFICATE_REGISTERED`) 여부는 검증하지 않는다.
 
 ## 6. 인증·인가 오류 응답 주의사항
 
-- `401`: `SecurityConfig`의 `authenticationEntryPoint`가 `response.sendError(401, "인증이 필요합니다.")`를 호출하며, 실제 응답 본문은 Spring Boot 기본 에러 핸들러가 생성한다. `{ "message" }` 형식이 아니다.
-- `403`: 별도의 `AccessDeniedHandler`가 없어 Spring Security 기본 처리를 따른다. 마찬가지로 `{ "message" }` 형식이 아니다.
+`401`·`403`은 `GlobalExceptionHandler`가 아니라 `SecurityConfig`가 직접 응답 본문을 작성한다(`writeError` 메서드). 코드값은 고정이며 요청 상황에 따라 메시지가 달라지지 않는다.
+
+- `401`: `authenticationEntryPoint`가 호출되어 `{ "code": "UNAUTHORIZED", "message": "인증이 필요합니다." }`를 응답한다.
+- `403`: `accessDeniedHandler`가 호출되어 `{ "code": "ACCESS_DENIED", "message": "접근 권한이 없습니다." }`를 응답한다.
+
+형식 자체(`{ code, message }`)는 `GlobalExceptionHandler`가 만드는 응답과 같지만, 만들어지는 위치(Security 필터 체인 vs. 컨트롤러 예외 처리)가 다르다.
 
 ## 7. 교육 이수 상태 값
 

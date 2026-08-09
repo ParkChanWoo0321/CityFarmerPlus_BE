@@ -1,24 +1,31 @@
 package chungbuk.cityfarmerplus.auth.config;
 
-import chungbuk.cityfarmerplus.auth.jwt.JwtAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 @Configuration
-@EnableWebSecurity
-@RequiredArgsConstructor
+@EnableMethodSecurity
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private static final String ROLE_CLAIM = "role";
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -26,29 +33,75 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(csrf -> csrf.disable())
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
-            .authorizeHttpRequests(auth -> auth
-                // 회원가입/로그인/중복확인은 토큰이 없는 상태에서도 호출 가능해야 하므로 permitAll
-                .requestMatchers("/api/auth/signup", "/api/auth/login", "/api/auth/check-id").permitAll()
-                .requestMatchers("/error").permitAll()
-                // 도시농부 전용 API는 userType이 URBAN_FARMER인 토큰만 접근 가능
-                .requestMatchers("/api/urban-farmer/**").hasRole("URBAN_FARMER")
-                // 그 외(예: /api/auth/me, /api/auth/logout)는 유효한 토큰이 있어야 접근 가능
-                .anyRequest().authenticated()
-            )
-
-            // 인증 실패 시 기본 동작(로그인 폼으로 리다이렉트) 대신, REST API답게 401만 응답하도록 지정
-            .exceptionHandling(ex -> ex.authenticationEntryPoint((request, response, authException) ->
-                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "인증이 필요합니다.")
-            ))
-
-            // 우리가 만든 JwtAuthenticationFilter를, Spring Security의 기본 로그인 필터보다 먼저 실행되게 등록
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .csrf(csrf -> csrf.disable())
+                .formLogin(form -> form.disable())
+                .httpBasic(basic -> basic.disable())
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers(HttpMethod.POST, "/api/auth/signup", "/api/auth/login")
+                        .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/auth/check-id")
+                        .permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/internal/center-admins")
+                        .permitAll()
+                        .requestMatchers("/error")
+                        .permitAll()
+                        .requestMatchers("/api/urban-farmer/**")
+                        .hasRole("URBAN_FARMER")
+                        .requestMatchers("/api/admin/**")
+                        .hasRole("CENTER_ADMIN")
+                        .anyRequest()
+                        .authenticated())
+                .oauth2ResourceServer(resourceServer -> resourceServer
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(this::convertAuthentication))
+                        .authenticationEntryPoint((request, response, exception) ->
+                                writeError(
+                                        response,
+                                        HttpServletResponse.SC_UNAUTHORIZED,
+                                        "UNAUTHORIZED",
+                                        "인증이 필요합니다."
+                                )))
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint((request, response, cause) ->
+                                writeError(
+                                        response,
+                                        HttpServletResponse.SC_UNAUTHORIZED,
+                                        "UNAUTHORIZED",
+                                        "인증이 필요합니다."
+                                ))
+                        .accessDeniedHandler((request, response, cause) ->
+                                writeError(
+                                        response,
+                                        HttpServletResponse.SC_FORBIDDEN,
+                                        "ACCESS_DENIED",
+                                        "접근 권한이 없습니다."
+                                )));
 
         return http.build();
+    }
+
+    private JwtAuthenticationToken convertAuthentication(Jwt jwt) {
+        String role = jwt.getClaimAsString(ROLE_CLAIM);
+        List<GrantedAuthority> authorities = role == null || role.isBlank()
+                ? List.of()
+                : List.of(new SimpleGrantedAuthority("ROLE_" + role));
+        return new JwtAuthenticationToken(jwt, authorities, jwt.getSubject());
+    }
+
+    private void writeError(
+            HttpServletResponse response,
+            int status,
+            String code,
+            String message
+    ) throws IOException {
+        response.setStatus(status);
+        response.setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.getWriter().write(
+                "{\"code\":\"" + code + "\",\"message\":\"" + message + "\"}"
+        );
     }
 }
