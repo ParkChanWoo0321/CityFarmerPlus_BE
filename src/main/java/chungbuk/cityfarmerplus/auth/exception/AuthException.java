@@ -62,20 +62,4 @@ public class AuthException extends RuntimeException {
                 "인증 정보가 올바르지 않습니다."
         );
     }
-
-    public static AuthException adminProvisioningDisabled() {
-        return new AuthException(
-                HttpStatus.FORBIDDEN,
-                "PROVISIONING_DISABLED",
-                "담당자 계정 발급 기능이 비활성화되어 있습니다."
-        );
-    }
-
-    public static AuthException invalidAdminProvisioningKey() {
-        return new AuthException(
-                HttpStatus.UNAUTHORIZED,
-                "INVALID_PROVISIONING_KEY",
-                "담당자 계정 발급 키가 올바르지 않습니다."
-        );
-    }
 }

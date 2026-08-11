@@ -45,8 +45,6 @@ public class SecurityConfig {
                         .permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/check-id")
                         .permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/internal/center-admins")
-                        .permitAll()
                         .requestMatchers("/error")
                         .permitAll()
                         .anyRequest()
