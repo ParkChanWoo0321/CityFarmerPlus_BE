@@ -3,10 +3,13 @@ package chungbuk.cityfarmerplus.auth.config;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.ObjectProvider;
+import chungbuk.cityfarmerplus.auth.service.ActiveAccountVerifier;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
@@ -16,6 +19,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -33,17 +37,25 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            ActiveAccountFilter activeAccountFilter
+    ) throws Exception {
         http
+                .cors(Customizer.withDefaults())
                 .csrf(csrf -> csrf.disable())
                 .formLogin(form -> form.disable())
                 .httpBasic(basic -> basic.disable())
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers(HttpMethod.OPTIONS, "/**")
+                        .permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/signup", "/api/auth/login")
                         .permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/check-id")
+                        .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/education/courses")
                         .permitAll()
                         .requestMatchers("/error")
                         .permitAll()
@@ -72,9 +84,20 @@ public class SecurityConfig {
                                         HttpServletResponse.SC_FORBIDDEN,
                                         "ACCESS_DENIED",
                                         "접근 권한이 없습니다."
-                                )));
+                                )))
+                .addFilterAfter(
+                        activeAccountFilter,
+                        BearerTokenAuthenticationFilter.class
+                );
 
         return http.build();
+    }
+
+    @Bean
+    public ActiveAccountFilter activeAccountFilter(
+            ObjectProvider<ActiveAccountVerifier> verifierProvider
+    ) {
+        return new ActiveAccountFilter(verifierProvider);
     }
 
     private JwtAuthenticationToken convertAuthentication(Jwt jwt) {
