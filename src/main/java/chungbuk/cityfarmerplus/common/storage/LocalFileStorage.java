@@ -1,6 +1,8 @@
 package chungbuk.cityfarmerplus.common.storage;
 
 import org.springframework.stereotype.Component;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -114,6 +116,28 @@ public class LocalFileStorage implements FileStorage {
             deleteEmptyParents(realParent, realRoot);
         } catch (IOException exception) {
             throw new FileStorageException("파일을 삭제하지 못했습니다.", exception);
+        }
+    }
+
+    @Override
+    public Resource load(String storageKey) {
+        Path target = resolveWithinRoot(storageKey);
+        try {
+            if (!Files.exists(root) || !Files.exists(target.getParent())) {
+                throw new FileStorageException("저장된 파일을 찾을 수 없습니다.");
+            }
+            Path realRoot = root.toRealPath();
+            Path realParent = target.getParent().toRealPath();
+            if (!realParent.startsWith(realRoot)) {
+                throw new FileStorageException("허용되지 않은 파일 저장 경로입니다.");
+            }
+            Path realTarget = realParent.resolve(target.getFileName());
+            if (!Files.isRegularFile(realTarget, LinkOption.NOFOLLOW_LINKS)) {
+                throw new FileStorageException("저장된 파일을 찾을 수 없습니다.");
+            }
+            return new FileSystemResource(realTarget);
+        } catch (IOException exception) {
+            throw new FileStorageException("파일을 읽지 못했습니다.", exception);
         }
     }
 

@@ -1,6 +1,7 @@
 package chungbuk.cityfarmerplus.common.storage;
 
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.core.io.Resource;
 
 public interface FileStorage {
 
@@ -12,6 +13,8 @@ public interface FileStorage {
     );
 
     void delete(String storageKey);
+
+    Resource load(String storageKey);
 
     record StoredFile(String storageKey, long sizeBytes, String sha256) {
     }
