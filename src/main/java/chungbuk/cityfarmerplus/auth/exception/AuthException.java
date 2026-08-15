@@ -62,4 +62,21 @@ public class AuthException extends RuntimeException {
                 "인증 정보가 올바르지 않습니다."
         );
     }
+
+    public static AuthException invalidPassword() {
+        return new AuthException(
+                HttpStatus.UNAUTHORIZED,
+                "INVALID_PASSWORD",
+                "비밀번호가 일치하지 않습니다."
+        );
+    }
+
+    public static AuthException withdrawalNotAllowed() {
+        return new AuthException(
+                HttpStatus.CONFLICT,
+                "ACCOUNT_WITHDRAWAL_NOT_ALLOWED",
+                "현재 계정 상태에서는 탈퇴할 수 없습니다."
+        );
+    }
+
 }

@@ -1,13 +1,16 @@
 package chungbuk.cityfarmerplus.auth.controller;
 
+import chungbuk.cityfarmerplus.auth.dto.AccountWithdrawalRequest;
 import chungbuk.cityfarmerplus.auth.dto.LoginIdAvailabilityResponse;
 import chungbuk.cityfarmerplus.auth.dto.LoginRequest;
 import chungbuk.cityfarmerplus.auth.dto.SignupRequest;
 import chungbuk.cityfarmerplus.auth.dto.TokenResponse;
+import chungbuk.cityfarmerplus.auth.dto.UserProfileUpdateRequest;
 import chungbuk.cityfarmerplus.auth.dto.UserResponse;
-import chungbuk.cityfarmerplus.auth.exception.AuthException;
 import chungbuk.cityfarmerplus.auth.jwt.JwtTokenProvider;
+import chungbuk.cityfarmerplus.auth.service.AccountWithdrawalService;
 import chungbuk.cityfarmerplus.auth.service.AuthService;
+import chungbuk.cityfarmerplus.common.web.AuthenticatedUser;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,6 +34,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final JwtTokenProvider jwtTokenProvider;
+    private final AccountWithdrawalService accountWithdrawalService;
 
     @PostMapping("/signup")
     public ResponseEntity<UserResponse> signup(
@@ -71,12 +76,30 @@ public class AuthController {
 
     @GetMapping("/me")
     public ResponseEntity<UserResponse> me(Authentication authentication) {
-        try {
-            Long userId = Long.valueOf(authentication.getName());
-            return ResponseEntity.ok(authService.getById(userId));
-        } catch (NumberFormatException exception) {
-            throw AuthException.invalidAuthentication();
-        }
+        return ResponseEntity.ok(authService.getById(AuthenticatedUser.id(authentication)));
+    }
+
+    @PatchMapping("/me")
+    public ResponseEntity<UserResponse> updateMe(
+            Authentication authentication,
+            @Valid @RequestBody UserProfileUpdateRequest request
+    ) {
+        return ResponseEntity.ok(authService.updateProfile(
+                AuthenticatedUser.id(authentication),
+                request
+        ));
+    }
+
+    @PostMapping("/withdrawal")
+    public ResponseEntity<Void> withdraw(
+            Authentication authentication,
+            @Valid @RequestBody AccountWithdrawalRequest request
+    ) {
+        accountWithdrawalService.withdraw(
+                AuthenticatedUser.id(authentication),
+                request.password()
+        );
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/logout")
