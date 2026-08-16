@@ -37,7 +37,7 @@ public class FileDeletionWorker {
         } catch (RuntimeException exception) {
             task.retryAfterFailure(exception, now);
             log.warn(
-                    "A withdrawn account file deletion will be retried. taskId={}, attempts={}",
+                    "A scheduled file deletion will be retried. taskId={}, attempts={}",
                     task.getId(),
                     task.getAttempts()
             );

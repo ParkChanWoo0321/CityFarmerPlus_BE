@@ -58,9 +58,20 @@ public class FileDeletionTask {
     private Instant createdAt;
 
     public static FileDeletionTask accountWithdrawal(String storageKey, Instant now) {
+        return pending(storageKey, "ACCOUNT_WITHDRAWAL", now);
+    }
+
+    public static FileDeletionTask pending(
+            String storageKey,
+            String reason,
+            Instant now
+    ) {
+        if (reason == null || reason.isBlank() || reason.length() > 50) {
+            throw new IllegalArgumentException("파일 삭제 사유가 올바르지 않습니다.");
+        }
         FileDeletionTask task = new FileDeletionTask();
         task.storageKey = storageKey;
-        task.reason = "ACCOUNT_WITHDRAWAL";
+        task.reason = reason;
         task.attempts = 0;
         task.nextAttemptAt = now;
         return task;
