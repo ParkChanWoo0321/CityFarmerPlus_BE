@@ -5,9 +5,12 @@ import chungbuk.cityfarmerplus.auth.exception.AuthException;
 import chungbuk.cityfarmerplus.auth.repository.UserRepository;
 import chungbuk.cityfarmerplus.farm.dto.FarmProfileCreateRequest;
 import chungbuk.cityfarmerplus.farm.dto.FarmProfileResponse;
+import chungbuk.cityfarmerplus.farm.dto.FarmProfileUpdateRequest;
 import chungbuk.cityfarmerplus.farm.entity.FarmProfile;
 import chungbuk.cityfarmerplus.farm.exception.FarmProfileException;
 import chungbuk.cityfarmerplus.farm.repository.FarmProfileRepository;
+import chungbuk.cityfarmerplus.jobposting.entity.JobPosting;
+import chungbuk.cityfarmerplus.jobposting.repository.JobPostingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -25,10 +28,11 @@ public class FarmProfileService {
 
     private final FarmProfileRepository farmProfileRepository;
     private final UserRepository userRepository;
+    private final JobPostingRepository jobPostingRepository;
 
     @Transactional
     public FarmProfileResponse create(Long userId, FarmProfileCreateRequest request) {
-        User owner = getActiveFarmOwner(userId);
+        User owner = getActiveFarmOwnerForUpdate(userId);
 
         if (farmProfileRepository.existsByOwnerId(userId)) {
             throw FarmProfileException.profileAlreadyExists();
@@ -47,7 +51,8 @@ public class FarmProfileService {
                 request.cityCounty(),
                 normalizeCrops(request.crops()),
                 request.mainActivities().trim(),
-                businessNumber
+                businessNumber,
+                request.farmAreaPyeong()
         );
 
         try {
@@ -64,8 +69,67 @@ public class FarmProfileService {
         return FarmProfileResponse.from(profile);
     }
 
+    @Transactional
+    public FarmProfileResponse updateMine(
+            Long userId,
+            FarmProfileUpdateRequest request
+    ) {
+        getActiveFarmOwnerForUpdate(userId);
+        FarmProfile profile = farmProfileRepository.findByOwnerIdForUpdate(userId)
+                .orElseThrow(FarmProfileException::profileNotFound);
+        if (!profile.canUpdateBasicInformation()) {
+            throw FarmProfileException.profileUpdateNotAllowed();
+        }
+
+        String businessNumber = normalizeOptionalNumber(
+                request.businessRegistrationNumber()
+        );
+        if (profile.getStatus() == FarmProfile.FarmProfileStatus.APPROVED
+                && profile.ownershipIdentityDiffers(
+                request.farmName().trim(),
+                request.representativeName().trim(),
+                request.farmAddress().trim(),
+                request.cityCounty(),
+                businessNumber,
+                request.farmAreaPyeong()
+        ) && jobPostingRepository.existsByFarmProfileOwnerIdAndStatusNotIn(
+                userId,
+                List.of(
+                        JobPosting.JobPostingStatus.CANCELLED,
+                        JobPosting.JobPostingStatus.WORK_COMPLETED
+                )
+        )) {
+            throw FarmProfileException.profileUpdateNotAllowed();
+        }
+
+        profile.updateBasicInformation(
+                request.farmName().trim(),
+                request.representativeName().trim(),
+                normalizeRequiredNumber(request.contactNumber()),
+                request.farmAddress().trim(),
+                request.cityCounty(),
+                normalizeCrops(request.crops()),
+                request.mainActivities().trim(),
+                businessNumber,
+                request.farmAreaPyeong()
+        );
+        return FarmProfileResponse.from(profile);
+    }
+
     private User getActiveFarmOwner(Long userId) {
         User user = userRepository.findById(userId)
+                .orElseThrow(AuthException::userNotFound);
+        if (!user.isActive()) {
+            throw AuthException.inactiveAccount();
+        }
+        if (user.getUserType() != User.UserType.FARM) {
+            throw FarmProfileException.farmRoleRequired();
+        }
+        return user;
+    }
+
+    private User getActiveFarmOwnerForUpdate(Long userId) {
+        User user = userRepository.findByIdForUpdate(userId)
                 .orElseThrow(AuthException::userNotFound);
         if (!user.isActive()) {
             throw AuthException.inactiveAccount();

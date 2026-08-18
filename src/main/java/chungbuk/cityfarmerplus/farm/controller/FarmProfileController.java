@@ -3,6 +3,7 @@ package chungbuk.cityfarmerplus.farm.controller;
 import chungbuk.cityfarmerplus.auth.exception.AuthException;
 import chungbuk.cityfarmerplus.farm.dto.FarmProfileCreateRequest;
 import chungbuk.cityfarmerplus.farm.dto.FarmProfileResponse;
+import chungbuk.cityfarmerplus.farm.dto.FarmProfileUpdateRequest;
 import chungbuk.cityfarmerplus.farm.service.FarmProfileService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +12,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -39,6 +41,16 @@ public class FarmProfileController {
     public ResponseEntity<FarmProfileResponse> getMine(Authentication authentication) {
         return ResponseEntity.ok(
                 farmProfileService.getMine(getUserId(authentication))
+        );
+    }
+
+    @PatchMapping("/me")
+    public ResponseEntity<FarmProfileResponse> updateMine(
+            Authentication authentication,
+            @Valid @RequestBody FarmProfileUpdateRequest request
+    ) {
+        return ResponseEntity.ok(
+                farmProfileService.updateMine(getUserId(authentication), request)
         );
     }
 

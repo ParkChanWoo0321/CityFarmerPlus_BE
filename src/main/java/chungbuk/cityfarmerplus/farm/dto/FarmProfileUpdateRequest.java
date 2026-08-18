@@ -11,7 +11,7 @@ import jakarta.validation.constraints.Max;
 
 import java.util.List;
 
-public record FarmProfileCreateRequest(
+public record FarmProfileUpdateRequest(
         @NotBlank(message = "농가명은 필수입니다.")
         @Size(max = 100, message = "농가명은 100자 이하여야 합니다.")
         String farmName,
@@ -56,7 +56,7 @@ public record FarmProfileCreateRequest(
         @Max(value = 100_000_000, message = "농지 면적은 100000000평 이하여야 합니다.")
         Integer farmAreaPyeong
 ) {
-    public FarmProfileCreateRequest(
+    public FarmProfileUpdateRequest(
             String farmName,
             String representativeName,
             String contactNumber,

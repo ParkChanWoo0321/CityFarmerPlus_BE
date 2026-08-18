@@ -30,6 +30,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -86,6 +87,23 @@ class FarmProfileControllerWebTest {
                 .andExpect(jsonPath("$.farmName").value("충주 사과농원"));
 
         verify(farmProfileService).getMine(15L);
+    }
+
+    @Test
+    void farmJwtUpdatesItsOwnProfile() throws Exception {
+        when(jwtDecoder.decode("farm-jwt")).thenReturn(jwt("15", "FARM"));
+        when(farmProfileService.updateMine(eq(15L), any()))
+                .thenReturn(response());
+
+        mockMvc.perform(patch(MY_PROFILE_ENDPOINT)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer farm-jwt")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .characterEncoding("UTF-8")
+                        .content(validRequestJson()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.farmName").value("충주 사과농원"));
+
+        verify(farmProfileService).updateMine(eq(15L), any());
     }
 
     @Test
@@ -215,7 +233,8 @@ class FarmProfileControllerWebTest {
                   "cityCounty": "CHUNGJU",
                   "crops": ["사과", "복숭아"],
                   "mainActivities": "사과 재배와 수확 작업을 합니다.",
-                  "businessRegistrationNumber": "123-45-67890"
+                  "businessRegistrationNumber": "123-45-67890",
+                  "farmAreaPyeong": 1200
                 }
                 """;
     }

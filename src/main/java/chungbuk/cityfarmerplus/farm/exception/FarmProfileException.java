@@ -46,4 +46,13 @@ public class FarmProfileException extends RuntimeException {
                 "이미 등록된 농가 정보와 충돌합니다."
         );
     }
+
+    public static FarmProfileException profileUpdateNotAllowed() {
+        return new FarmProfileException(
+                HttpStatus.CONFLICT,
+                "FARM_PROFILE_UPDATE_NOT_ALLOWED",
+                "현재 농가 프로필 상태에서는 기본 정보를 수정할 수 없습니다."
+        );
+    }
+
 }
