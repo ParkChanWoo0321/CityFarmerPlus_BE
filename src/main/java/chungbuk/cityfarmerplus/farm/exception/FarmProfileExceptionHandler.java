@@ -6,12 +6,14 @@ import chungbuk.cityfarmerplus.farm.controller.FarmProfileController;
 import chungbuk.cityfarmerplus.farm.ownership.controller.FarmOwnershipSubmissionController;
 import chungbuk.cityfarmerplus.farm.ownership.controller.FarmOwnershipDocumentController;
 import chungbuk.cityfarmerplus.farm.ownership.exception.FarmOwnershipException;
+import chungbuk.cityfarmerplus.jobposting.controller.FarmJobPostingController;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice(assignableTypes = {
         FarmCandidateController.class,
+        FarmJobPostingController.class,
         FarmProfileController.class,
         FarmOwnershipSubmissionController.class,
         FarmOwnershipDocumentController.class
