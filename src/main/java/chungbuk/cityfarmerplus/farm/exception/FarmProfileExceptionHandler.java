@@ -1,6 +1,7 @@
 package chungbuk.cityfarmerplus.farm.exception;
 
 import chungbuk.cityfarmerplus.auth.dto.ErrorResponse;
+import chungbuk.cityfarmerplus.application.controller.FarmCandidateController;
 import chungbuk.cityfarmerplus.farm.controller.FarmProfileController;
 import chungbuk.cityfarmerplus.farm.ownership.controller.FarmOwnershipSubmissionController;
 import chungbuk.cityfarmerplus.farm.ownership.controller.FarmOwnershipDocumentController;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice(assignableTypes = {
+        FarmCandidateController.class,
         FarmProfileController.class,
         FarmOwnershipSubmissionController.class,
         FarmOwnershipDocumentController.class
