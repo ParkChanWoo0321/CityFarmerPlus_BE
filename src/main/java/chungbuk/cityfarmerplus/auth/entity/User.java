@@ -16,6 +16,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.Instant;
+import java.time.LocalDate;
 
 @Entity
 @Table(
@@ -41,6 +42,15 @@ public class User {
 
     @Column(nullable = false, length = 50)
     private String name;
+
+    @Column(name = "phone_number", length = 11)
+    private String phoneNumber;
+
+    @Column(name = "birth_date")
+    private LocalDate birthDate;
+
+    @Column(length = 255)
+    private String address;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "user_type", nullable = false, length = 30)
@@ -96,6 +106,49 @@ public class User {
 
     public boolean isActive() {
         return accountStatus == AccountStatus.ACTIVE;
+    }
+
+    public boolean canWithdraw() {
+        return accountStatus == AccountStatus.ACTIVE;
+    }
+
+    public void updateName(String name) {
+        String normalizedName = name == null ? "" : name.trim();
+        if (normalizedName.isBlank() || normalizedName.length() > 50) {
+            throw new IllegalArgumentException("이름이 올바르지 않습니다.");
+        }
+        this.name = normalizedName;
+    }
+
+    public void updatePhoneNumber(String phoneNumber) {
+        if (phoneNumber != null && !phoneNumber.matches("\\d{10,11}")) {
+            throw new IllegalArgumentException("연락처는 숫자 10~11자리여야 합니다.");
+        }
+        this.phoneNumber = phoneNumber;
+    }
+
+    public void updateBirthDate(LocalDate birthDate) {
+        if (birthDate != null && birthDate.isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException("생년월일은 미래일 수 없습니다.");
+        }
+        this.birthDate = birthDate;
+    }
+
+    public void updateAddress(String address) {
+        String normalizedAddress = address == null ? null : address.trim();
+        if (normalizedAddress != null && normalizedAddress.length() > 255) {
+            throw new IllegalArgumentException("주소는 255자 이하여야 합니다.");
+        }
+        this.address = normalizedAddress == null || normalizedAddress.isBlank()
+                ? null
+                : normalizedAddress;
+    }
+
+    public void withdraw() {
+        if (!canWithdraw()) {
+            throw new IllegalStateException("현재 계정 상태에서는 탈퇴할 수 없습니다.");
+        }
+        accountStatus = AccountStatus.WITHDRAWN;
     }
 
     public enum UserType {

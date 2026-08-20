@@ -34,4 +34,13 @@ out/
 /.nb-gradle/
 
 ### VS Code ###
-.vscode/.doc-reference/
+.vscode/
+.doc-reference/
+
+### Local secrets ###
+.env
+.env.*
+!.env.example
+src/main/resources/application-local.properties
+src/main/resources/application-local.yml
+/data/uploads/

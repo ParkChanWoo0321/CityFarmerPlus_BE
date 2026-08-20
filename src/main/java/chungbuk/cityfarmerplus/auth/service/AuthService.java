@@ -3,6 +3,7 @@ package chungbuk.cityfarmerplus.auth.service;
 import chungbuk.cityfarmerplus.auth.dto.LoginIdAvailabilityResponse;
 import chungbuk.cityfarmerplus.auth.dto.LoginRequest;
 import chungbuk.cityfarmerplus.auth.dto.SignupRequest;
+import chungbuk.cityfarmerplus.auth.dto.UserProfileUpdateRequest;
 import chungbuk.cityfarmerplus.auth.dto.UserResponse;
 import chungbuk.cityfarmerplus.auth.entity.User;
 import chungbuk.cityfarmerplus.auth.exception.AuthException;
@@ -40,6 +41,9 @@ public class AuthService {
                 request.name().trim(),
                 request.userType()
         );
+        user.updatePhoneNumber(normalizeOptionalPhoneNumber(request.phoneNumber()));
+        user.updateBirthDate(request.birthDate());
+        user.updateAddress(request.address());
 
         try {
             return UserResponse.from(userRepository.saveAndFlush(user));
@@ -76,6 +80,33 @@ public class AuthService {
         return UserResponse.from(user);
     }
 
+    @Transactional
+    public UserResponse updateProfile(
+            Long userId,
+            UserProfileUpdateRequest request
+    ) {
+        User user = userRepository.findByIdForUpdate(userId)
+                .orElseThrow(AuthException::userNotFound);
+        if (!user.isActive()) {
+            throw AuthException.inactiveAccount();
+        }
+
+        if (request.name() != null) {
+            user.updateName(request.name());
+        }
+        if (request.phoneNumber() != null) {
+            user.updatePhoneNumber(normalizeOptionalPhoneNumber(request.phoneNumber()));
+        }
+        if (request.birthDate() != null) {
+            user.updateBirthDate(request.birthDate());
+        }
+        if (request.address() != null) {
+            user.updateAddress(request.address());
+        }
+
+        return UserResponse.from(user);
+    }
+
     public LoginIdAvailabilityResponse checkLoginIdAvailability(String loginId) {
         String normalizedLoginId = normalizeLoginId(loginId);
         boolean available = !userRepository.existsByLoginIdIgnoreCase(normalizedLoginId);
@@ -87,6 +118,13 @@ public class AuthService {
             return "";
         }
         return loginId.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeOptionalPhoneNumber(String phoneNumber) {
+        if (phoneNumber == null || phoneNumber.isBlank()) {
+            return null;
+        }
+        return phoneNumber.replaceAll("\\D", "");
     }
 
     public record LoginResult(
