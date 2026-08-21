@@ -61,14 +61,17 @@
 | Framework | Spring Boot 4.1, Spring MVC, Spring Data JPA |
 | Security | Spring Security, Bearer JWT Resource Server |
 | Database | MySQL |
+| File Storage | Local filesystem, S3-compatible object storage |
+| Deployment | Docker, Render Blueprint |
 | Validation / Build | Jakarta Bean Validation, Gradle |
 | Test | JUnit 5, Mockito, Spring MVC Test |
 
 - 전체 API 목록: [API 명세 인덱스](docs/API_SPEC_INDEX.md)
 - 통합 계약: [전체 API 명세](docs/FULL_API_SPEC.md)
 - 노션 복사용 기능별 문서: [기능별 API 명세](docs/notion/README.md)
-- 2026-08-20 기준 Controller 21개, HTTP API 66개를 코드와 문서에서 대조했습니다.
-- 전체 테스트 결과: 322건, 실패 0건, 오류 0건, 스킵 3건
+- Render 무료 배포 준비: [Render 배포 가이드](docs/RENDER_DEPLOYMENT.md)
+- 2026-08-21 기준 비즈니스 Controller 21개, HTTP API 66개를 코드와 문서에서 대조했습니다. 배포 liveness endpoint인 `GET /health`는 별도입니다.
+- 전체 테스트 결과: 335건, 실패 0건, 오류 0건, 스킵 3건
 
 검증 명령:
 
