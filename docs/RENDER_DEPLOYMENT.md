@@ -3,7 +3,8 @@
 - 대상: CityFarmerPlus Spring Boot API
 - 배포 방식: Render Web Service + Docker
 - 데이터베이스: 외부 MySQL
-- 영구 파일: S3 호환 비공개 오브젝트 스토리지
+- 현재 0원 데모 파일: Render 로컬 임시 저장소
+- 영구 파일 전환 시: S3 호환 비공개 오브젝트 스토리지
 - Health Check: `GET /health`
 
 이 문서는 포트폴리오 데모 환경을 위한 배포 계약이다. Render는 Free 인스턴스를 운영용으로 사용하지 말 것을 안내하고 있으므로, 실제 개인정보나 민감한 농가 증빙을 저장하는 운영 환경으로 간주하면 안 된다.
@@ -16,7 +17,9 @@
 - `backend-2`의 심사·최종 매칭·근무 배정 기능까지 `develop`에 병합되어 있다.
 - 검증을 마친 `develop`이 `main`에 병합되어 있다.
 - 배포할 정확한 `main` 커밋에서 전체 테스트가 통과한다.
-- 외부 MySQL과 S3 호환 저장소를 빈 데모 데이터로 검증한다.
+- 외부 MySQL을 빈 데모 데이터로 검증한다.
+- 현재 0원 데모의 로컬 업로드 파일이 재시작·재배포 시 사라지는 제약을 공개한다.
+- 영구 파일이 필요하면 공개 전에 S3 호환 저장소로 전환해 검증한다.
 - 실제 비밀번호, JWT 비밀키, S3 접근 키는 Git 또는 문서에 저장하지 않는다.
 
 `backend-2` 병합 전 배포는 Docker·Health Check·DB·파일 저장소 연결을 확인하는 임시 배포일 뿐, 완성본 배포가 아니다.
@@ -30,7 +33,7 @@
 - Free 사용량은 워크스페이스당 월 750 인스턴스 시간이며, 대역폭과 빌드 시간에도 별도 한도가 적용된다.
 - 외부 DB나 오브젝트 스토리지로 비정상적으로 많은 외부 트래픽을 발생시키면 Free 서비스가 정지될 수 있다.
 
-따라서 MySQL은 외부 영구 DB를 사용하고, 농가 소유 증빙 파일은 `FILE_STORAGE_TYPE=s3`로 저장해야 한다. `FILE_STORAGE_TYPE=local`은 로컬 개발이나 파일 유실을 허용하는 일회성 Smoke Test에만 사용한다.
+따라서 MySQL은 외부 영구 DB를 사용한다. 현재 `render.yaml`은 추가 결제수단 없이 배포하기 위한 0원 데모 설정으로 `FILE_STORAGE_TYPE=local`을 사용하며, 업로드 파일 유실을 허용하는 Smoke Test 용도다. 영구 파일이 필요한 공개 데모나 운영 환경은 `FILE_STORAGE_TYPE=s3`로 전환해야 한다.
 
 공식 문서:
 
@@ -95,8 +98,8 @@ JWT 비밀키는 비밀번호 관리자나 신뢰할 수 있는 암호학적 난
 
 | 변수 | Render 권장값 | 설명 |
 |---|---|---|
-| `FILE_STORAGE_TYPE` | `s3` | `local` 또는 `s3` |
-| `FILE_STORAGE_ROOT` | 설정하지 않음 | `local`에서만 사용하는 경로. 로컬 기본값은 `./data/uploads` |
+| `FILE_STORAGE_TYPE` | 현재 0원 데모 `local` | 영구 파일 전환 시 `s3` |
+| `FILE_STORAGE_ROOT` | `./data/uploads` | `local`에서만 사용하며 Render 재시작·재배포 시 파일이 사라짐 |
 
 ### S3 호환 저장소
 
@@ -156,7 +159,7 @@ DB에는 파일 메타데이터와 논리 `storageKey`가 남는다. Render Free
 1. GitHub 저장소를 Render에 연결한다.
 2. `render.yaml`이 들어간 커밋이 `main`에 반영된 것을 확인한 뒤 Blueprint를 생성한다. 현재 Blueprint는 의도하지 않은 즉시 배포를 막기 위해 `autoDeployTrigger: off`로 고정되어 있으므로 검증할 정확한 커밋을 수동 배포한다.
 3. 위 환경 변수를 등록하되 비밀값은 Dashboard에서만 입력한다. Blueprint의 `JWT_SECRET`은 `generateValue`로 생성되며, 서비스를 수동 생성한다면 최소 32 random bytes 이상의 값을 직접 생성한다. `sync: false`는 Blueprint를 처음 생성할 때만 값을 입력받고 기존 Blueprint 갱신에서는 해당 값을 변경하지 않으므로, 이후 변경은 Dashboard에서 직접 수행한다.
-4. 외부 MySQL과 S3 bucket을 먼저 준비한다.
+4. 외부 MySQL을 먼저 준비한다. `FILE_STORAGE_TYPE=s3`로 전환할 때만 S3 bucket과 전용 키를 추가한다.
 5. 최초 배포 로그에서 애플리케이션이 Render의 `PORT`로 시작했는지 확인한다.
 6. `https://SERVICE.onrender.com/health`가 인증 없이 `200`과 `{"status":"UP"}`을 반환하는지 확인한다.
 
@@ -201,10 +204,11 @@ DB에는 파일 메타데이터와 논리 `storageKey`가 남는다. Render Free
 - [ ] `JWT_SECRET`을 32 random bytes 이상으로 새로 생성했다.
 - [ ] `JWT_ISSUER`와 실제 API URL이 일치한다.
 - [ ] `CORS_ALLOWED_ORIGINS`를 실제 프론트 Origin으로 제한했다.
-- [ ] Render에서 `FILE_STORAGE_TYPE=s3`를 사용한다.
-- [ ] S3 bucket이 비공개이고 전용 키가 최소 권한만 가진다.
+- [ ] 현재 0원 데모가 `FILE_STORAGE_TYPE=local`이며 업로드 파일 유실 가능성을 공개했다.
+- [ ] 영구 파일이 필요하면 `FILE_STORAGE_TYPE=s3`로 전환하고 비공개 bucket과 최소 권한 전용 키를 사용한다.
 - [ ] `/health`가 공개 상태에서 정상 응답한다.
-- [ ] DB와 업로드 파일의 재배포·Cold Start 이후 보존을 확인했다.
+- [ ] DB의 재배포·Cold Start 이후 보존을 확인했다.
+- [ ] S3 전환 시 업로드 파일의 재배포·Cold Start 이후 보존을 확인했다.
 - [ ] 저장소, 배포 설정, 로그 어디에도 실제 비밀값이 없다.
 
 Render Free의 Cold Start와 비영구 로컬 파일시스템은 장애가 아니라 상품 제약이다. 사용자에게 첫 요청 지연을 안내하고, 실제 운영으로 전환할 때는 유료 인스턴스·백업·모니터링·마이그레이션·비밀키 교체 정책을 함께 마련한다.

@@ -26,18 +26,6 @@ services:
       - key: JPA_SHOW_SQL
         value: "false"
       - key: FILE_STORAGE_TYPE
-        value: s3
-      - key: S3_ENDPOINT
-        sync: false
-      - key: S3_REGION
-        sync: false
-      - key: S3_BUCKET
-        sync: false
-      - key: S3_ACCESS_KEY_ID
-        sync: false
-      - key: S3_SECRET_ACCESS_KEY
-        sync: false
-      - key: S3_PATH_STYLE
-        value: "true"
-      - key: S3_PREFIX
-        value: cityfarmerplus
+        value: local
+      - key: FILE_STORAGE_ROOT
+        value: ./data/uploads
