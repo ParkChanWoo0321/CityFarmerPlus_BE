@@ -10,11 +10,12 @@
 
 ## 1. 최종 배포 전 조건
 
-배포 설정과 인프라는 지금 준비할 수 있지만, 공개 URL의 최종 배포 기준 브랜치는 다음 조건을 모두 충족한 `develop`이다.
+배포 설정과 인프라는 지금 준비할 수 있지만, 공개 URL의 최종 배포 기준 브랜치는 다음 조건을 모두 충족한 `main`이다.
 
 - `backend-1`이 `develop`에 병합되어 있다.
 - `backend-2`의 심사·최종 매칭·근무 배정 기능까지 `develop`에 병합되어 있다.
-- 병합된 정확한 커밋에서 전체 테스트가 통과한다.
+- 검증을 마친 `develop`이 `main`에 병합되어 있다.
+- 배포할 정확한 `main` 커밋에서 전체 테스트가 통과한다.
 - 외부 MySQL과 S3 호환 저장소를 빈 데모 데이터로 검증한다.
 - 실제 비밀번호, JWT 비밀키, S3 접근 키는 Git 또는 문서에 저장하지 않는다.
 
@@ -141,19 +142,19 @@ DB에는 파일 메타데이터와 논리 `storageKey`가 남는다. Render Free
 
 ## 6. Render 서비스 생성
 
-저장소에 포함된 `render.yaml`은 최종 서비스 브랜치를 `develop`으로 지정한다. 따라서 이 배포 준비 브랜치가 `develop`에 병합되기 전에는 Blueprint를 만들지 않는다. 병합 전 인프라 Smoke Test가 꼭 필요하면 Blueprint 대신 Web Service를 수동 생성하고 해당 준비 브랜치를 임시로 지정한다. 수동 생성 시에는 다음 값을 사용한다.
+저장소에 포함된 `render.yaml`은 최종 서비스 브랜치를 `main`으로 지정한다. 따라서 배포 준비 코드가 `main`에 반영되기 전에는 Blueprint를 만들지 않는다. 병합 전 인프라 Smoke Test가 꼭 필요하면 Blueprint 대신 Web Service를 수동 생성하고 해당 준비 브랜치를 임시로 지정한다. 수동 생성 시에는 다음 값을 사용한다.
 
 | 항목 | 값 |
 |---|---|
 | Service Type | Web Service |
 | Runtime | Docker |
-| Branch | 준비 중에는 별도 배포 브랜치, 최종본은 `develop` |
+| Branch | 준비 중에는 별도 배포 브랜치, 최종본은 `main` |
 | Instance Type | Free |
 | Health Check Path | `/health` |
 | Auto-Deploy | 준비 단계 `Off`; CI가 생기면 테스트 성공 후 배포하도록 `checksPass` 검토 |
 
 1. GitHub 저장소를 Render에 연결한다.
-2. `render.yaml`이 들어간 커밋이 `develop`에 병합된 것을 확인한 뒤 Blueprint를 생성한다. 현재 Blueprint는 의도하지 않은 즉시 배포를 막기 위해 `autoDeployTrigger: off`로 고정되어 있으므로 검증할 정확한 커밋을 수동 배포한다.
+2. `render.yaml`이 들어간 커밋이 `main`에 반영된 것을 확인한 뒤 Blueprint를 생성한다. 현재 Blueprint는 의도하지 않은 즉시 배포를 막기 위해 `autoDeployTrigger: off`로 고정되어 있으므로 검증할 정확한 커밋을 수동 배포한다.
 3. 위 환경 변수를 등록하되 비밀값은 Dashboard에서만 입력한다. Blueprint의 `JWT_SECRET`은 `generateValue`로 생성되며, 서비스를 수동 생성한다면 최소 32 random bytes 이상의 값을 직접 생성한다. `sync: false`는 Blueprint를 처음 생성할 때만 값을 입력받고 기존 Blueprint 갱신에서는 해당 값을 변경하지 않으므로, 이후 변경은 Dashboard에서 직접 수행한다.
 4. 외부 MySQL과 S3 bucket을 먼저 준비한다.
 5. 최초 배포 로그에서 애플리케이션이 Render의 `PORT`로 시작했는지 확인한다.
@@ -192,8 +193,9 @@ DB에는 파일 메타데이터와 논리 `storageKey`가 남는다. Render Free
 ## 8. 최종 공개 체크리스트
 
 - [ ] `backend-2`까지 `develop`에 병합했다.
+- [ ] 검증을 마친 `develop`을 `main`에 병합했다.
 - [ ] 병합된 정확한 커밋에서 전체 테스트가 통과했다.
-- [ ] `render.yaml`이 `develop`에 있고 Auto-Deploy가 준비 단계에서는 꺼져 있다.
+- [ ] `render.yaml`이 `main`에 있고 Auto-Deploy가 준비 단계에서는 꺼져 있다.
 - [ ] 외부 MySQL JDBC URL에서 `createDatabaseIfNotExist`를 제거했다.
 - [ ] 최초 스키마 확인 뒤 `JPA_DDL_AUTO=validate`로 전환했다.
 - [ ] `JWT_SECRET`을 32 random bytes 이상으로 새로 생성했다.
