@@ -1,5 +1,6 @@
 package chungbuk.cityfarmerplus.common.storage;
 
+import com.google.cloud.storage.Storage;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import software.amazon.awssdk.core.checksums.RequestChecksumCalculation;
@@ -15,7 +16,8 @@ class FileStorageConfigurationTest {
                     .withUserConfiguration(
                             FileStorageConfig.class,
                             LocalFileStorage.class,
-                            S3FileStorage.class
+                            S3FileStorage.class,
+                            GcsFileStorage.class
                     );
 
     @Test
@@ -28,7 +30,9 @@ class FileStorageConfigurationTest {
                     assertThat(context).hasSingleBean(FileStorage.class);
                     assertThat(context).hasSingleBean(LocalFileStorage.class);
                     assertThat(context).doesNotHaveBean(S3FileStorage.class);
+                    assertThat(context).doesNotHaveBean(GcsFileStorage.class);
                     assertThat(context).doesNotHaveBean(S3Client.class);
+                    assertThat(context).doesNotHaveBean(Storage.class);
                 });
     }
 
@@ -50,6 +54,7 @@ class FileStorageConfigurationTest {
                     assertThat(context).hasSingleBean(FileStorage.class);
                     assertThat(context).hasSingleBean(S3FileStorage.class);
                     assertThat(context).doesNotHaveBean(LocalFileStorage.class);
+                    assertThat(context).doesNotHaveBean(GcsFileStorage.class);
                     assertThat(context).hasSingleBean(S3Client.class);
 
                     S3Client client = context.getBean(S3Client.class);
@@ -69,6 +74,52 @@ class FileStorageConfigurationTest {
                         "app.file-storage.s3.region=auto",
                         "app.file-storage.s3.bucket=documents",
                         "app.file-storage.s3.access-key-id=access-key"
+                )
+                .run(context -> assertThat(context).hasFailed());
+    }
+
+    @Test
+    void usesGcsStorageOnlyWhenExplicitlySelected() {
+        contextRunner
+                .withPropertyValues(
+                        "app.file-storage.type=gcs",
+                        "app.file-storage.gcs.project-id=test-project",
+                        "app.file-storage.gcs.bucket=documents",
+                        "app.file-storage.gcs.prefix=cityfarmerplus/prod"
+                )
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).hasSingleBean(FileStorage.class);
+                    assertThat(context).hasSingleBean(GcsFileStorage.class);
+                    assertThat(context).doesNotHaveBean(LocalFileStorage.class);
+                    assertThat(context).doesNotHaveBean(S3FileStorage.class);
+                    assertThat(context).hasSingleBean(Storage.class);
+                    assertThat(context.getBean(Storage.class)
+                            .getOptions()
+                            .getProjectId()).isEqualTo("test-project");
+                });
+    }
+
+    @Test
+    void allowsGcsProjectIdToBeOmitted() {
+        contextRunner
+                .withPropertyValues(
+                        "app.file-storage.type=gcs",
+                        "app.file-storage.gcs.bucket=documents"
+                )
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).hasSingleBean(GcsFileStorage.class);
+                    assertThat(context).hasSingleBean(Storage.class);
+                });
+    }
+
+    @Test
+    void failsFastWhenGcsBucketIsMissing() {
+        contextRunner
+                .withPropertyValues(
+                        "app.file-storage.type=gcs",
+                        "app.file-storage.gcs.project-id=test-project"
                 )
                 .run(context -> assertThat(context).hasFailed());
     }

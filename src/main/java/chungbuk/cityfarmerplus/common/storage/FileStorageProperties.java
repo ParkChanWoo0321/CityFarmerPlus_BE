@@ -7,11 +7,16 @@ import org.springframework.boot.context.properties.bind.ConstructorBinding;
 public record FileStorageProperties(
         Type type,
         String root,
-        S3 s3
+        S3 s3,
+        Gcs gcs
 ) {
 
     public FileStorageProperties(String root) {
-        this(Type.LOCAL, root, null);
+        this(Type.LOCAL, root, null, null);
+    }
+
+    public FileStorageProperties(Type type, String root, S3 s3) {
+        this(type, root, s3, null);
     }
 
     @ConstructorBinding
@@ -30,11 +35,45 @@ public record FileStorageProperties(
             }
             s3.validate();
         }
+        if (type == Type.GCS) {
+            if (gcs == null) {
+                throw new IllegalArgumentException(
+                        "gcs 파일 저장소 설정이 필요합니다."
+                );
+            }
+            gcs.validate();
+        }
     }
 
     public enum Type {
         LOCAL,
-        S3
+        S3,
+        GCS
+    }
+
+    public record Gcs(
+            String projectId,
+            String bucket,
+            String prefix
+    ) {
+
+        public Gcs {
+            projectId = normalize(projectId);
+            bucket = normalize(bucket);
+            prefix = normalize(prefix);
+        }
+
+        private void validate() {
+            if (isBlank(bucket)) {
+                throw new IllegalArgumentException(
+                        "GCS_BUCKET가 필요합니다."
+                );
+            }
+        }
+
+        private static String normalize(String value) {
+            return value == null ? "" : value.trim();
+        }
     }
 
     public record S3(

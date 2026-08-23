@@ -21,10 +21,10 @@ WORKDIR /app
 
 COPY --from=builder --chown=app:app /workspace/app.jar ./app.jar
 
-ENV PORT=10000
+ENV PORT=8080
 
 USER app
 
-EXPOSE 10000
+EXPOSE 8080
 
 ENTRYPOINT ["java", "-jar", "app.jar"]

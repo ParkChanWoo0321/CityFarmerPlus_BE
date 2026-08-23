@@ -1,5 +1,7 @@
 package chungbuk.cityfarmerplus.common.storage;
 
+import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.StorageOptions;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -43,6 +45,21 @@ public class FileStorageConfig {
                         .chunkedEncodingEnabled(false)
                         .build())
                 .build();
+    }
+
+    @Bean(destroyMethod = "close")
+    @ConditionalOnProperty(
+            name = "app.file-storage.type",
+            havingValue = "gcs"
+    )
+    public Storage fileStorageGcsClient(FileStorageProperties properties) {
+        FileStorageProperties.Gcs gcs = properties.gcs();
+        StorageOptions.Builder builder = StorageOptions.newBuilder();
+        if (!gcs.projectId().isBlank()) {
+            builder.setProjectId(gcs.projectId());
+        }
+        // Credentials are intentionally not configured here. The client uses ADC.
+        return builder.build().getService();
     }
 
     private URI endpoint(String value) {
