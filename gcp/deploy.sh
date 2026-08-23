@@ -80,7 +80,7 @@ gcloud builds submit . \
   --config=cloudbuild.yaml \
   --service-account="${BUILD_SA_RESOURCE}" \
   --gcs-source-staging-dir="gs://${BUILD_SOURCE_BUCKET}/source" \
-  --substitutions="BRANCH_NAME=main,COMMIT_SHA=${COMMIT_SHA},SHORT_SHA=${SHORT_SHA},_REGION=${REGION},_REPOSITORY=${REPOSITORY},_IMAGE=${SERVICE},_SERVICE=${SERVICE},_TAG=${SHORT_SHA},_DEPLOY=false"
+  --substitutions="BRANCH_NAME=main,_REGION=${REGION},_REPOSITORY=${REPOSITORY},_IMAGE=${SERVICE},_SERVICE=${SERVICE},_TAG=${SHORT_SHA},_DEPLOY=false"
 
 IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${SERVICE}:${SHORT_SHA}"
 
