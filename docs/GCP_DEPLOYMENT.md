@@ -365,10 +365,11 @@ Cloud Build trigger는 GCP Console에서 다음 값으로 만든다.
 
 | 항목 | 값 |
 |---|---|
-| Region | `us-west1` |
+| Trigger region | `global` (무료 기본 build pool 사용) |
 | Event | Push to a branch |
 | Repository | `ParkChanWoo0321/CityFarmerPlus_BE` |
 | Branch regex | `^main$` |
+| Ignored files | `docs/**`, `**/*.md` |
 | Configuration | Cloud Build configuration file |
 | Location | `/cloudbuild.yaml` |
 | Service account | `cityfarmerplus-build@PROJECT_ID.iam.gserviceaccount.com` |
@@ -378,6 +379,8 @@ Cloud Build trigger는 GCP Console에서 다음 값으로 만든다.
 | `_SERVICE` | `cityfarmerplus-api` |
 | `_TAG` | `$SHORT_SHA` |
 | `_DEPLOY` | `true` |
+
+Trigger 위치와 배포 위치는 서로 다르다. Trigger는 별도 private pool이 필요 없는 `global` 기본 pool에서 실행하고, `_REGION=us-west1`을 통해 Artifact Registry와 Cloud Run은 `us-west1`에 배포한다.
 
 trigger가 사용하는 build 서비스 계정은 6절에서 만든 전용 계정을 반드시 선택한다. Trigger가 실행될 때 YAML 안의 서비스 계정보다 trigger에 지정한 계정이 우선한다.
 
