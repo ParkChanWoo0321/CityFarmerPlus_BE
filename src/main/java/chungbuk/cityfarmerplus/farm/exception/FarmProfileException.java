@@ -1,18 +1,12 @@
 package chungbuk.cityfarmerplus.farm.exception;
 
-import lombok.Getter;
+import chungbuk.cityfarmerplus.common.exception.DomainException;
 import org.springframework.http.HttpStatus;
 
-@Getter
-public class FarmProfileException extends RuntimeException {
-
-    private final HttpStatus status;
-    private final String code;
+public class FarmProfileException extends DomainException {
 
     private FarmProfileException(HttpStatus status, String code, String message) {
-        super(message);
-        this.status = status;
-        this.code = code;
+        super(status, code, message);
     }
 
     public static FarmProfileException farmRoleRequired() {

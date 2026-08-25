@@ -4,6 +4,8 @@ import chungbuk.cityfarmerplus.jobposting.entity.JobPosting;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
@@ -18,6 +20,13 @@ import java.time.LocalTime;
 
 public interface JobPostingRepository extends JpaRepository<JobPosting, Long>,
         JpaSpecificationExecutor<JobPosting> {
+
+    @Override
+    @EntityGraph(attributePaths = {"farmProfile", "farmProfile.owner"})
+    Page<JobPosting> findAll(
+            Specification<JobPosting> specification,
+            Pageable pageable
+    );
 
     Page<JobPosting> findByFarmProfileOwnerId(Long ownerId, Pageable pageable);
 

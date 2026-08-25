@@ -1,58 +1,26 @@
 # CityFarmerPlus 회원·인증 API 명세서
 
-- 문서 버전: 1.1
-- 작성일: 2026-08-03
+- 문서 버전: 2.0
+- 갱신일: 2026-08-20
 - 구현 기준 브랜치: `backend-1`
-- 적용 범위: 회원가입, 담당자 계정 발급, 아이디 중복 확인, 로그인, JWT 인증, 내 정보 조회, 로그아웃
+- 적용 범위: 회원가입, 아이디 확인, 로그인, 내 정보 조회·수정, 회원 탈퇴, 로그아웃
+- 관련 문서: [FULL_API_SPEC.md](FULL_API_SPEC.md), [API_SPEC_INDEX.md](API_SPEC_INDEX.md)
 
 ## 1. 공통 사항
 
-### 1.1 기본 URL
-
-로컬 개발 환경의 기본 URL은 다음과 같다.
+로컬 기본 URL:
 
 ```text
 http://localhost:8080
 ```
 
-Postman에서는 다음 환경 변수를 사용하는 것을 권장한다.
-
-| 변수 | 예시 |
-|---|---|
-| `baseUrl` | `http://localhost:8080` |
-| `accessToken` | 로그인 응답의 `accessToken` |
-| `adminProvisioningKey` | 담당자 계정 발급 전용 키 |
-
-### 1.2 요청 및 응답 형식
-
-- JSON 요청의 `Content-Type`은 `application/json`이다.
-- JWT 인증이 필요한 API는 다음 헤더를 전송한다.
+보호 API의 인증 헤더:
 
 ```http
 Authorization: Bearer {{accessToken}}
 ```
 
-### 1.3 사용자 유형
-
-| 값 | 의미 | 공개 회원가입 |
-|---|---|---|
-| `URBAN_FARMER` | 도시농부 | 가능 |
-| `FARM` | 농가 | 가능 |
-| `CENTER_ADMIN` | 충북 전체 시·군 담당자 | 불가능 |
-
-한 회원 레코드는 하나의 `userType`만 가지므로 도시농부와 농가 역할을 동시에 가질 수 없다.
-
-### 1.4 계정 상태
-
-| 값 | 의미 |
-|---|---|
-| `ACTIVE` | 정상 사용 가능 |
-| `SUSPENDED` | 정지된 계정 |
-| `WITHDRAWN` | 탈퇴한 계정 |
-
-신규 회원은 `ACTIVE` 상태로 생성된다. `SUSPENDED`, `WITHDRAWN` 상태의 계정은 로그인하거나 인증 사용자 정보를 조회할 수 없다.
-
-### 1.5 공통 오류 응답
+공통 오류 형식:
 
 ```json
 {
@@ -61,20 +29,37 @@ Authorization: Bearer {{accessToken}}
 }
 ```
 
-## 2. API 목록
+## 2. 역할과 계정 상태
 
-| 기능 | Method | URL | 인증 | 성공 상태 |
+| `userType` | 의미 | 공개 회원가입 |
+|---|---|---|
+| `URBAN_FARMER` | 도시농부 | 가능 |
+| `FARM` | 농가 | 가능 |
+| `CENTER_ADMIN` | backend-2 담당자 공통 역할 | 불가능 |
+
+한 계정은 하나의 역할만 가진다. 본인인증은 하지 않으므로 같은 사람이 서로 다른 아이디로 두 일반 역할 계정을 각각 만드는 것은 차단하지 못한다.
+
+| `accountStatus` | 의미 |
+|---|---|
+| `ACTIVE` | 정상 사용 가능 |
+| `SUSPENDED` | 정지 |
+| `WITHDRAWN` | 탈퇴 |
+
+신규 회원은 `ACTIVE`로 생성된다. `CENTER_ADMIN` enum과 JWT 역할 변환은 backend-2 병합용 공통 계약이지만, backend-1에는 담당자 계정 발급 또는 담당자 업무 처리 API가 없다.
+
+## 3. API 목록
+
+| 기능 | Method | URL | 인증 | 성공 |
 |---|---|---|---|---|
 | 회원가입 | `POST` | `/api/auth/signup` | 불필요 | `201 Created` |
-| 담당자 계정 발급 | `POST` | `/api/internal/center-admins` | 발급 전용 키 | `201 Created` |
 | 아이디 중복 확인 | `GET` | `/api/auth/check-id` | 불필요 | `200 OK` |
 | 로그인 | `POST` | `/api/auth/login` | 불필요 | `200 OK` |
 | 내 정보 조회 | `GET` | `/api/auth/me` | Bearer JWT | `200 OK` |
+| 내 정보 수정 | `PATCH` | `/api/auth/me` | Bearer JWT | `200 OK` |
+| 회원 탈퇴 | `POST` | `/api/auth/withdrawal` | Bearer JWT | `204 No Content` |
 | 로그아웃 | `POST` | `/api/auth/logout` | Bearer JWT | `204 No Content` |
 
-## 3. 회원가입
-
-### 3.1 요청
+## 4. 회원가입
 
 ```http
 POST /api/auth/signup
@@ -86,71 +71,55 @@ Content-Type: application/json
   "loginId": "farm_user",
   "password": "password123!",
   "name": "농가 사용자",
-  "userType": "FARM"
+  "userType": "FARM",
+  "phoneNumber": "010-1234-5678",
+  "birthDate": "1985-03-12",
+  "address": "충청북도 충주시"
 }
 ```
 
-| 필드 | 타입 | 필수 | 제약 조건 |
-|---|---|---|---|
-| `loginId` | String | O | 4~30자, 영문 소문자·숫자·밑줄만 허용 |
-| `password` | String | O | 8~64자 |
-| `name` | String | O | 공백만 입력할 수 없음, 최대 50자 |
+| 필드 | 타입 | 필수 | 규칙 |
+|---|---|---:|---|
+| `loginId` | String | O | 영문 소문자·숫자·밑줄 4~30자 |
+| `password` | String | O | 8~64자, UTF-8 72바이트 이하 |
+| `name` | String | O | 공백만 입력 불가, 최대 50자 |
 | `userType` | Enum | O | `URBAN_FARMER` 또는 `FARM` |
+| `phoneNumber` | String | X | 숫자 10~11자리, 하이픈 허용 |
+| `birthDate` | Date | X | 미래일 불가 |
+| `address` | String | X | 최대 255자 |
 
-비밀번호는 평문으로 저장하지 않고 BCrypt 해시로 저장한다.
+`loginId`는 소문자로 정규화하고, 전화번호는 숫자만 저장한다. 비밀번호는 BCrypt 해시로 저장한다.
 
-### 3.2 성공 응답
-
-```http
-HTTP/1.1 201 Created
-```
+성공 응답:
 
 ```json
 {
   "id": 1,
   "loginId": "farm_user",
   "name": "농가 사용자",
+  "phoneNumber": "01012345678",
+  "birthDate": "1985-03-12",
+  "address": "충청북도 충주시",
   "userType": "FARM",
   "accountStatus": "ACTIVE"
 }
 ```
 
-### 3.3 오류 응답
+대표 오류:
 
-| 상태 | 코드 | 발생 조건 |
+| HTTP | 코드 | 조건 |
 |---|---|---|
-| `400` | `VALIDATION_ERROR` | 필수값 누락 또는 형식·길이 위반 |
-| `400` | `INVALID_REQUEST` | 잘못된 JSON 또는 존재하지 않는 Enum 값 |
-| `400` | `MANAGER_SIGNUP_NOT_ALLOWED` | `CENTER_ADMIN`으로 공개 회원가입 시도 |
+| `400` | `VALIDATION_ERROR` | 형식·길이 위반 |
+| `400` | `MANAGER_SIGNUP_NOT_ALLOWED` | `CENTER_ADMIN` 공개 가입 시도 |
 | `409` | `DUPLICATE_LOGIN_ID` | 이미 사용 중인 아이디 |
-| `409` | `DATA_CONFLICT` | 기타 데이터 무결성 충돌 |
 
-중복 아이디 예시:
-
-```json
-{
-  "code": "DUPLICATE_LOGIN_ID",
-  "message": "이미 사용 중인 아이디입니다."
-}
-```
-
-## 4. 아이디 중복 확인
-
-### 4.1 요청
+## 5. 아이디 중복 확인
 
 ```http
 GET /api/auth/check-id?loginId=farm_user
 ```
 
-| Query Parameter | 타입 | 필수 | 제약 조건 |
-|---|---|---|---|
-| `loginId` | String | O | 4~30자, 영문 소문자·숫자·밑줄만 허용 |
-
-### 4.2 사용 가능한 아이디
-
-```http
-HTTP/1.1 200 OK
-```
+`loginId`는 회원가입과 같은 4~30자 패턴을 사용한다.
 
 ```json
 {
@@ -159,22 +128,9 @@ HTTP/1.1 200 OK
 }
 ```
 
-### 4.3 이미 사용 중인 아이디
+이미 사용 중이면 HTTP 상태는 그대로 `200`이고 `available=false`다.
 
-```json
-{
-  "loginId": "farm_user",
-  "available": false
-}
-```
-
-잘못된 아이디 형식은 `400 VALIDATION_ERROR`로 처리한다.
-
-현재 `loginId` 쿼리 파라미터 자체가 누락된 경우에는 Spring 기본 `400` 응답이 반환될 수 있어 공통 오류 JSON 형식이 보장되지 않는다.
-
-## 5. 로그인
-
-### 5.1 요청
+## 6. 로그인
 
 ```http
 POST /api/auth/login
@@ -188,18 +144,7 @@ Content-Type: application/json
 }
 ```
 
-| 필드 | 타입 | 필수 | 설명 |
-|---|---|---|---|
-| `loginId` | String | O | 가입 시 설정한 아이디 |
-| `password` | String | O | 가입 시 설정한 비밀번호 |
-
-로그인 시 아이디의 앞뒤 공백을 제거하고 영문 대문자를 소문자로 변환한 뒤 조회한다.
-
-### 5.2 성공 응답
-
-```http
-HTTP/1.1 200 OK
-```
+성공 응답:
 
 ```json
 {
@@ -210,249 +155,120 @@ HTTP/1.1 200 OK
     "id": 1,
     "loginId": "farm_user",
     "name": "농가 사용자",
+    "phoneNumber": "01012345678",
+    "birthDate": "1985-03-12",
+    "address": "충청북도 충주시",
     "userType": "FARM",
     "accountStatus": "ACTIVE"
   }
 }
 ```
 
-### 5.3 오류 응답
+아이디가 없거나 비밀번호가 틀리면 모두 `401 INVALID_CREDENTIALS`로 응답한다. 비활성 계정은 `403 INACTIVE_ACCOUNT`다.
 
-| 상태 | 코드 | 발생 조건 |
-|---|---|---|
-| `400` | `VALIDATION_ERROR` | 아이디 또는 비밀번호가 비어 있음 |
-| `400` | `INVALID_REQUEST` | 요청 JSON이 올바르지 않음 |
-| `401` | `INVALID_CREDENTIALS` | 아이디가 없거나 비밀번호가 일치하지 않음 |
-| `403` | `INACTIVE_ACCOUNT` | 정지 또는 탈퇴 상태의 계정 |
-
-아이디 존재 여부 노출을 방지하기 위해 존재하지 않는 아이디와 잘못된 비밀번호는 같은 오류로 응답한다.
-
-```json
-{
-  "code": "INVALID_CREDENTIALS",
-  "message": "아이디 또는 비밀번호가 일치하지 않습니다."
-}
-```
-
-## 6. 내 정보 조회
-
-### 6.1 요청
+## 7. 내 정보 조회
 
 ```http
 GET /api/auth/me
 Authorization: Bearer {{accessToken}}
 ```
 
-### 6.2 성공 응답
+응답은 회원가입의 `UserResponse` 형식과 같다.
+
+## 8. 내 정보 수정
 
 ```http
-HTTP/1.1 200 OK
+PATCH /api/auth/me
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
 ```
 
 ```json
 {
-  "id": 1,
-  "loginId": "farm_user",
-  "name": "농가 사용자",
-  "userType": "FARM",
-  "accountStatus": "ACTIVE"
+  "name": "수정한 이름",
+  "phoneNumber": "010-9999-8888",
+  "birthDate": "1985-03-12",
+  "address": "충청북도 청주시"
 }
 ```
 
-### 6.3 오류 응답
+모든 필드는 선택이며 전달한 필드만 수정한다.
 
-| 상태 | 코드 | 발생 조건 |
-|---|---|---|
-| `401` | `UNAUTHORIZED` | 토큰 누락, 만료, 위조 또는 형식 오류 |
-| `401` | `INVALID_AUTHENTICATION` | 토큰의 사용자 식별자가 올바르지 않음 |
-| `403` | `INACTIVE_ACCOUNT` | 정지 또는 탈퇴 상태의 계정 |
-| `404` | `USER_NOT_FOUND` | 토큰의 사용자 ID에 해당하는 회원이 없음 |
+| 필드 | 규칙 |
+|---|---|
+| `name` | 공백만 입력 불가, 최대 50자 |
+| `phoneNumber` | 숫자 10~11자리, 하이픈 허용. 빈 문자열은 `null`로 저장 |
+| `birthDate` | 미래일 불가. `null`은 변경하지 않음 |
+| `address` | 최대 255자. 빈 문자열은 `null`로 저장 |
 
-인증 실패 예시:
+`loginId`, `userType`, `accountStatus`, 비밀번호는 이 API로 바꿀 수 없다.
+
+## 9. 회원 탈퇴
+
+```http
+POST /api/auth/withdrawal
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+```
 
 ```json
 {
-  "code": "UNAUTHORIZED",
-  "message": "인증이 필요합니다."
+  "password": "password123!"
 }
 ```
 
-## 7. 로그아웃
+현재 비밀번호를 다시 확인한 뒤 계정을 `WITHDRAWN`으로 변경한다.
 
-### 7.1 요청
+- 도시농부에게 `MATCHED` 지원이 있으면 `409 UPCOMING_WORK_EXISTS`다.
+- 탈퇴 가능한 도시농부의 `APPLIED` 지원은 `WITHDRAWN`으로 정리한다.
+- 도시농부의 사업참여 신청 중 `DRAFT`, `SUBMITTED`, `REJECTED`는 `CANCELLED`로 정리하고, `APPROVED` 신청과 기존 심사 이력은 유지한다.
+- 교육 `PENDING_REVIEW` 제출은 메타데이터를 유지하되 활성 계정 전용 담당자 쿼리에서 제외한다.
+- 농가의 미종결 공고에 `MATCHED` 지원이 있으면 탈퇴할 수 없다.
+- 탈퇴 가능한 농가의 미종결 공고는 `CANCELLED`, 남은 지원은 `POSTING_CANCELLED`, 농가 프로필은 `INACTIVE`가 된다.
+- 교육 및 농가 소유 증빙 파일은 커밋 후 삭제하고, 실패하면 기록된 삭제 작업을 백그라운드에서 재시도한다.
+
+비밀번호가 틀리면 `401 INVALID_PASSWORD`, 이미 탈퇴·정지 상태면 `409 ACCOUNT_WITHDRAWAL_NOT_ALLOWED`다.
+
+## 10. 로그아웃
 
 ```http
 POST /api/auth/logout
 Authorization: Bearer {{accessToken}}
 ```
 
-### 7.2 성공 응답
+서버 세션과 토큰 블랙리스트를 사용하지 않는다. 응답은 `204`이며 클라이언트가 저장한 JWT를 삭제해야 한다. 기존 토큰은 만료 전까지 암호학적으로는 유효하지만, 계정 상태가 달라졌다면 활성 계정 필터가 요청을 거절한다.
 
-```http
-HTTP/1.1 204 No Content
-```
-
-응답 본문은 없다.
-
-현재 인증 방식은 서버 세션을 사용하지 않는 Stateless JWT 방식이다. 로그아웃 시 서버에서 토큰을 폐기하거나 블랙리스트에 등록하지 않으므로 클라이언트가 저장한 토큰을 삭제해야 한다. 삭제하지 않은 기존 토큰은 만료 시각까지 유효하다.
-
-## 8. JWT 명세
-
-### 8.1 서명 및 만료
+## 11. JWT 계약
 
 | 항목 | 값 |
 |---|---|
-| 서명 알고리즘 | `HS256` |
-| 기본 만료 시간 | 1시간 |
-| 인증 방식 | `Authorization: Bearer <token>` |
-| Refresh Token | 현재 미지원 |
-| Audience(`aud`) 검증 | 현재 미지원 |
+| 알고리즘 | `HS256` |
+| 기본 만료 | 1시간 |
+| `sub` | 회원 ID 문자열 |
+| `role` | `URBAN_FARMER`, `FARM`, `CENTER_ADMIN` |
+| Refresh Token | 미지원 |
+| 서버 블랙리스트 | 미지원 |
 
-### 8.2 Payload Claim
+`role`은 각각 `ROLE_URBAN_FARMER`, `ROLE_FARM`, `ROLE_CENTER_ADMIN`으로 변환된다. JWT가 유효해도 DB 계정이 `ACTIVE`가 아니거나 토큰 역할과 DB 역할이 다르면 활성 계정 필터가 `401 INVALID_ACCOUNT`를 반환한다.
 
-| Claim | 설명 | 예시 |
-|---|---|---|
-| `iss` | 토큰 발급자 | `https://api.cityfarmerplus.local` |
-| `sub` | 회원 ID | `"1"` |
-| `iat` | 발급 시각 | Unix timestamp |
-| `exp` | 만료 시각 | Unix timestamp |
-| `role` | 사용자 유형 | `FARM` |
-
-`role` Claim은 인증 시 다음 Spring Security 권한으로 변환된다.
-
-| JWT `role` | Spring Security Authority |
-|---|---|
-| `URBAN_FARMER` | `ROLE_URBAN_FARMER` |
-| `FARM` | `ROLE_FARM` |
-| `CENTER_ADMIN` | `ROLE_CENTER_ADMIN` |
-
-## 9. 환경 설정
-
-로컬 비밀값은 프로젝트 루트의 `.env`에 저장하며 `.env`는 Git에 커밋하지 않는다.
+## 12. 환경 변수
 
 | 환경 변수 | 필수 | 설명 |
-|---|---|---|
-| `DB_URL` | 선택 | MySQL 접속 URL |
-| `DB_USERNAME` | 선택 | MySQL 사용자명, 기본값 `root` |
+|---|---:|---|
+| `DB_URL` | X | MySQL URL |
+| `DB_USERNAME` | X | 기본 `root` |
 | `DB_PASSWORD` | O | MySQL 비밀번호 |
-| `JPA_DDL_AUTO` | 선택 | 기본값 `update` |
-| `JPA_SHOW_SQL` | 선택 | SQL 출력 여부, 기본값 `false` |
-| `JWT_SECRET` | O | UTF-8 기준 32바이트 이상의 JWT 서명 키 |
-| `JWT_ISSUER` | 선택 | JWT 발급자 |
-| `JWT_ACCESS_TOKEN_EXPIRATION` | 선택 | Spring Duration 형식, 기본값 `1h` |
-| `ADMIN_PROVISIONING_ENABLED` | 선택 | 담당자 계정 발급 활성화 여부, 기본값 `false` |
-| `ADMIN_PROVISIONING_KEY` | 활성화 시 O | UTF-8 기준 32바이트 이상의 담당자 발급 전용 키 |
+| `JPA_DDL_AUTO` | X | 기본 `update` |
+| `JWT_SECRET` | O | UTF-8 32바이트 이상 |
+| `JWT_ISSUER` | X | JWT 발급자 |
+| `JWT_ACCESS_TOKEN_EXPIRATION` | X | 기본 `1h` |
 
-운영 환경에서는 로컬 개발용 키를 사용하지 않고 충분히 긴 무작위 비밀키를 별도로 주입해야 한다. `JWT_SECRET`과 `ADMIN_PROVISIONING_KEY`는 서로 다른 값을 사용한다.
+개발용 자리표시자 비밀키는 실제 키로 교체해야 한다.
 
-## 10. 회원 테이블 논리 구조
+## 13. 현재 미지원
 
-테이블명: `users`
-
-| 컬럼 | 제약 | 설명 |
-|---|---|---|
-| `id` | PK, Auto Increment | 회원 식별자 |
-| `login_id` | NOT NULL, UNIQUE, 최대 30자 | 로그인 아이디 |
-| `password` | NOT NULL, 최대 100자 | BCrypt 비밀번호 해시 |
-| `name` | NOT NULL, 최대 50자 | 사용자 이름 |
-| `user_type` | NOT NULL, 최대 30자 | 사용자 유형 |
-| `account_status` | NOT NULL, 최대 20자 | 계정 상태 |
-| `created_at` | NOT NULL | 생성 시각 |
-| `updated_at` | NOT NULL | 수정 시각 |
-
-## 11. Postman 확인 순서
-
-1. `GET {{baseUrl}}/api/auth/check-id?loginId=farm_user`로 아이디 사용 가능 여부를 확인한다.
-2. `POST {{baseUrl}}/api/auth/signup`으로 회원을 생성한다.
-3. `POST {{baseUrl}}/api/auth/login`으로 로그인한다.
-4. 로그인 응답의 `accessToken`을 Postman 환경 변수 `accessToken`에 저장한다.
-5. `GET {{baseUrl}}/api/auth/me`에 Bearer Token을 설정해 인증을 확인한다.
-6. `POST {{baseUrl}}/api/auth/logout` 호출 후 클라이언트에 저장한 토큰을 삭제한다.
-
-담당자 계정은 다음 순서로 생성한다.
-
-1. `.env`에서 `ADMIN_PROVISIONING_ENABLED=true`로 설정한다.
-2. `ADMIN_PROVISIONING_KEY`에 32바이트 이상의 별도 무작위 키를 설정한다.
-3. 애플리케이션을 재시작한다.
-4. Postman으로 `POST {{baseUrl}}/api/internal/center-admins`를 호출한다.
-5. 계정 생성 후 발급 기능을 다시 비활성화하고 애플리케이션을 재시작한다.
-6. 생성한 담당자는 기존 로그인 API를 이용한다.
-
-## 12. 담당자 계정 발급
-
-담당자는 공개 회원가입으로 생성할 수 없으며, UI도 제공하지 않는다. 백엔드 개발자가 별도의 발급 키를 이용해 Postman으로만 생성한다. 담당자는 충북 전체 시·군을 담당하므로 관할 지역은 요청받지 않는다.
-
-### 12.1 요청
-
-```http
-POST /api/internal/center-admins
-Content-Type: application/json
-X-Admin-Provisioning-Key: {{adminProvisioningKey}}
-```
-
-```json
-{
-  "loginId": "center_admin01",
-  "password": "admin-password-123",
-  "name": "충북 담당자"
-}
-```
-
-| 필드 | 타입 | 필수 | 제약 조건 |
-|---|---|---|---|
-| `loginId` | String | O | 4~30자, 영문 소문자·숫자·밑줄만 허용 |
-| `password` | String | O | 12~64자이며 UTF-8 기준 72바이트 이하 |
-| `name` | String | O | 공백만 입력할 수 없음, 최대 50자 |
-
-요청에서 `userType`과 `accountStatus`는 받지 않는다. 서버가 항상 `CENTER_ADMIN`, `ACTIVE`로 설정하며 비밀번호는 BCrypt로 암호화한다.
-
-### 12.2 성공 응답
-
-```http
-HTTP/1.1 201 Created
-```
-
-```json
-{
-  "id": 3,
-  "loginId": "center_admin01",
-  "name": "충북 담당자",
-  "userType": "CENTER_ADMIN",
-  "accountStatus": "ACTIVE"
-}
-```
-
-계정 생성 응답에서는 JWT를 발급하지 않는다. 생성된 담당자는 `POST /api/auth/login`으로 로그인해 `role=CENTER_ADMIN` JWT를 발급받는다.
-
-### 12.3 오류 응답
-
-| 상태 | 코드 | 발생 조건 |
-|---|---|---|
-| `400` | `VALIDATION_ERROR` | 입력값 누락 또는 형식·길이 위반 |
-| `400` | `INVALID_REQUEST` | 요청 JSON이 올바르지 않음 |
-| `401` | `INVALID_PROVISIONING_KEY` | 발급 키 누락 또는 불일치 |
-| `403` | `PROVISIONING_DISABLED` | 담당자 계정 발급 기능이 비활성화됨 |
-| `409` | `DUPLICATE_LOGIN_ID` | 이미 사용 중인 아이디 |
-
-키 누락과 잘못된 키는 동일한 오류로 처리한다. 발급 키는 JWT 키나 DB 비밀번호와 재사용하지 않으며 Git, 요청 로그, 애플리케이션 로그에 기록하지 않는다.
-
-## 13. 현재 범위 밖 또는 미구현 기능
-
-다음 기능은 프로젝트 요구사항에는 포함되어 있지만 현재 인증 API 구현에는 포함되지 않았다.
-
-- Refresh Token과 서버 측 강제 로그아웃
-- 회원 승인 및 교육 이수 인증
-- 이수증 제출·반려·재제출·과거 파일 보관
-- 농가 소유 증빙 제출 및 담당자 승인
-- 회원 탈퇴 처리
-- 사용자 정보 수정 및 비밀번호 변경
-- 역할별 세부 업무 API 접근 제어
-
-추가로 현재 구현에는 다음 기술적 제한이 있다.
-
-- 역할 Claim을 Spring Security 권한으로 변환하지만 아직 역할별 `@PreAuthorize` 또는 URL 접근 정책은 적용하지 않았다.
-- 본인인증을 하지 않으므로 같은 사람이 서로 다른 아이디로 도시농부 계정과 농가 계정을 각각 생성하는 것은 방지할 수 없다.
-- 로그인과 `/me`에서는 계정 상태를 확인하지만, JWT 처리 단계에서 매 요청마다 최신 계정 상태를 DB에서 확인하지는 않는다. 향후 보호 API는 정지·탈퇴 계정 차단 정책을 별도로 적용해야 한다.
-- 별도의 CORS 설정이 없으므로 다른 도메인의 웹 프론트엔드와 연동할 때 허용 Origin 설정이 필요하다.
-- 사용자 요청에 따라 Flyway를 사용하지 않으며 현재 스키마는 Hibernate `ddl-auto=update`로 관리한다.
-- 누락된 Query Parameter, 지원하지 않는 HTTP Method 등 일부 Spring 기본 오류는 `{ "code", "message" }` 형식이 아닐 수 있다.
+- 소셜 로그인과 본인인증
+- Refresh Token과 비밀번호 재설정
+- 비밀번호 변경
+- 서버 측 강제 로그아웃
+- backend-1의 담당자 계정 발급 및 담당자 업무 처리 API
