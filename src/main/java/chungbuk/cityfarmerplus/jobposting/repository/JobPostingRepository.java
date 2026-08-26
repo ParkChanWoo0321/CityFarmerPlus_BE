@@ -87,11 +87,13 @@ public interface JobPostingRepository extends JpaRepository<JobPosting, Long>,
             @Param("now") LocalTime now
     );
 
-    List<JobPosting> findTop5ByStatusOrderByApprovedAtDesc(
+    List<JobPosting> findTop5ByStatusOrderByApprovedAtDescIdDesc(
             JobPosting.JobPostingStatus status
     );
 
-    List<JobPosting> findTop5ByFarmProfileOwnerIdOrderByUpdatedAtDesc(Long ownerId);
+    List<JobPosting> findTop5ByFarmProfileOwnerIdOrderByUpdatedAtDescIdDesc(
+            Long ownerId
+    );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""

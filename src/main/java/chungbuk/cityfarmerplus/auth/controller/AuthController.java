@@ -37,12 +37,13 @@ public class AuthController {
     private final AccountWithdrawalService accountWithdrawalService;
 
     @PostMapping("/signup")
-    public ResponseEntity<UserResponse> signup(
+    public ResponseEntity<TokenResponse> signup(
             @Valid @RequestBody SignupRequest request
     ) {
+        UserResponse user = authService.signup(request);
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(authService.signup(request));
+                .body(issueToken(user));
     }
 
     @GetMapping("/check-id")
@@ -62,16 +63,20 @@ public class AuthController {
             @Valid @RequestBody LoginRequest request
     ) {
         AuthService.LoginResult loginResult = authService.login(request);
+        return ResponseEntity.ok(issueToken(loginResult.user()));
+    }
+
+    private TokenResponse issueToken(UserResponse user) {
         JwtTokenProvider.IssuedAccessToken token = jwtTokenProvider.issueAccessToken(
-                loginResult.userId(),
-                loginResult.userType()
+                user.id(),
+                user.userType()
         );
 
-        return ResponseEntity.ok(TokenResponse.bearer(
+        return TokenResponse.bearer(
                 token.value(),
                 token.expiresInSeconds(),
-                loginResult.user()
-        ));
+                user
+        );
     }
 
     @GetMapping("/me")

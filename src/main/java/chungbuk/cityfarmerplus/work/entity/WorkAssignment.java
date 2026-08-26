@@ -164,14 +164,17 @@ public class WorkAssignment {
     }
 
     public void recordAttendance(AttendanceStatus attendance, User farmUser, Instant now) {
-        if (status != WorkStatus.SCHEDULED) {
-            throw new IllegalStateException("예정된 근무의 출결만 등록할 수 있습니다.");
-        }
         if (attendance == AttendanceStatus.NOT_RECORDED) {
             throw new IllegalArgumentException("출근 또는 결근을 선택해야 합니다.");
         }
+        if (attendanceStatus == attendance) {
+            return;
+        }
         if (attendanceStatus != AttendanceStatus.NOT_RECORDED) {
             throw new IllegalStateException("이미 등록된 출결은 담당자만 정정할 수 있습니다.");
+        }
+        if (status != WorkStatus.SCHEDULED) {
+            throw new IllegalStateException("예정된 근무의 출결만 등록할 수 있습니다.");
         }
         attendanceStatus = attendance;
         attendanceRecordedBy = farmUser;

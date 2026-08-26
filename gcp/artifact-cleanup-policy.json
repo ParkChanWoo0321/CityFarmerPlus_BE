@@ -1,0 +1,20 @@
+[
+  {
+    "name": "delete-noncurrent-images",
+    "action": {
+      "type": "Delete"
+    },
+    "condition": {
+      "tagState": "any"
+    }
+  },
+  {
+    "name": "keep-one-most-recent",
+    "action": {
+      "type": "Keep"
+    },
+    "mostRecentVersions": {
+      "keepCount": 1
+    }
+  }
+]

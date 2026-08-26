@@ -79,7 +79,10 @@ public class FarmHomeService {
                 )
         );
         List<JobPostingResponse> recent = postingResponseAssembler.assembleAll(
-                postingRepository.findTop5ByFarmProfileOwnerIdOrderByUpdatedAtDesc(userId)
+                postingRepository
+                        .findTop5ByFarmProfileOwnerIdOrderByUpdatedAtDescIdDesc(
+                                userId
+                        )
         );
         List<WorkAssignmentResponse> upcoming = assignmentRepository
                 .findUpcomingByFarmProfileId(

@@ -46,7 +46,7 @@ public class PublicJobPostingController {
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size
     ) {
         return service.getPostings(
-                AuthenticatedUser.id(authentication),
+                AuthenticatedUser.optionalId(authentication),
                 keyword,
                 region,
                 crop,
@@ -66,7 +66,7 @@ public class PublicJobPostingController {
             @RequestParam(defaultValue = "false") boolean includeClosed
     ) {
         return service.getPosting(
-                AuthenticatedUser.id(authentication),
+                AuthenticatedUser.optionalId(authentication),
                 postingId,
                 includeClosed
         );

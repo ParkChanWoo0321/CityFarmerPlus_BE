@@ -50,7 +50,7 @@ Content-Type: multipart/form-data
 | 허용 확장자 | `pdf`, `jpg`, `jpeg`, `png` |
 | 개별 파일 크기 | 최대 10 MiB (`10,485,760`바이트) |
 | 한 요청의 파일 총크기 | 최대 30 MiB (`31,457,280`바이트) |
-| 서버 multipart 수신 한도 | 파일당 `12MB`, 요청당 `35MB` |
+| 서버 multipart 수신 한도 | 파일당 `12MB`, 요청당 `31MB` |
 | 원본 파일명 | UTF-8 기준 최대 255바이트, 경로 부분 제거 후 표시용으로만 저장 |
 | 형식 검증 | 확장자, 확인 가능한 선언 MIME 타입, 실제 파일 시그니처를 교차 검증 |
 | 무결성 | 저장된 파일의 크기와 SHA-256을 다시 계산해 검증 결과와 비교 |
@@ -139,7 +139,7 @@ backend-2가 심사할 때 최신 `PENDING_REVIEW` 회차와 농가 프로필 �
 | `409` | `OWNERSHIP_SUBMISSION_DATA_CONFLICT` | 동시 처리 등으로 DB 제약 충돌 |
 | `413` | `OWNERSHIP_DOCUMENT_TOO_LARGE` | 개별 파일이 10 MiB 초과 |
 | `413` | `OWNERSHIP_DOCUMENTS_TOTAL_SIZE_TOO_LARGE` | 파일 총크기가 30 MiB 초과 |
-| `413` | `UPLOAD_REQUEST_TOO_LARGE` | multipart 파일 12MB 또는 요청 35MB의 서버 수신 한도 초과 |
+| `413` | `UPLOAD_REQUEST_TOO_LARGE` | multipart 파일 12MB 또는 요청 31MB의 서버 수신 한도 초과 |
 | `415` | `UNSUPPORTED_OWNERSHIP_DOCUMENT_TYPE` | 확장자가 없거나 점으로 끝나거나 허용되지 않은 확장자 |
 | `403` | `OWNERSHIP_DOCUMENT_ACCESS_DENIED` | 다른 농가의 문서 다운로드 시도 |
 | `500` | `OWNERSHIP_DOCUMENT_STORAGE_ERROR` | 파일 저장 실패 또는 저장 중 파일 내용 불일치 |

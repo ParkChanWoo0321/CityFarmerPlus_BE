@@ -77,7 +77,10 @@ public class FarmJobPostingService {
             int size
     ) {
         accessService.requireFarmProfile(userId);
-        var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        var pageable = PageRequest.of(page, size, Sort.by(
+                Sort.Order.desc("createdAt"),
+                Sort.Order.desc("id")
+        ));
         ZonedDateTime now = ZonedDateTime.now(SERVICE_ZONE);
         Specification<JobPosting> specification = Specification
                 .where(JobPostingSpecifications.belongsToFarmOwner(userId))

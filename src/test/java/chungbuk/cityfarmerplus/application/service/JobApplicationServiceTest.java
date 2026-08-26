@@ -19,6 +19,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -155,6 +158,22 @@ class JobApplicationServiceTest {
                 .isEqualTo("HARVEST,PACKING");
         assertThat(existing.getCanTravelSnapshot()).isTrue();
         assertThat(existing.getExperienceCountSnapshot()).isEqualTo(7);
+    }
+
+    @Test
+    void myApplicationsUseStableNewestFirstOrdering() {
+        User urbanFarmer = urbanFarmer();
+        var pageable = PageRequest.of(1, 10, Sort.by(
+                Sort.Order.desc("createdAt"),
+                Sort.Order.desc("id")
+        ));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(urbanFarmer));
+        when(applicationRepository.findByUrbanFarmerId(USER_ID, pageable))
+                .thenReturn(Page.empty(pageable));
+
+        service.getMine(USER_ID, 1, 10);
+
+        verify(applicationRepository).findByUrbanFarmerId(USER_ID, pageable);
     }
 
     private void arrangeCommon(

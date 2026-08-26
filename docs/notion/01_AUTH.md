@@ -1,6 +1,6 @@
 # CityFarmerPlus 회원·인증 API 명세서
 
-- 기준일: 2026-08-20
+- 기준일: 2026-08-26
 - 기준 소스: 현재 `backend-1` 작업 폴더의 `AuthController`, 인증 DTO, `AuthService`, `AccountWithdrawalService`, Security 및 예외 처리 코드
 - 로컬 Base URL: `http://localhost:8080`
 - API 수: 7개
@@ -11,7 +11,7 @@
 
 ## 1. 인증과 공통 형식
 
-보호 API는 로그인 응답으로 받은 JWT를 보낸다.
+보호 API는 회원가입 또는 로그인 응답으로 받은 JWT를 보낸다.
 
 ```http
 Authorization: Bearer {{accessToken}}
@@ -108,20 +108,31 @@ Content-Type: application/json
 ### 성공 응답
 
 - HTTP: `201 Created`
-- Body: `UserResponse`
+- Body: 로그인과 동일한 `TokenResponse`
+- JWT 서명: `HS256`
+- `sub`: 회원 ID 문자열
+- `role`: 회원 역할
+- 기본 만료시간: 1시간. 실제 `expiresInSeconds`는 서버 환경 설정을 따른다.
 
 ```json
 {
-  "id": 15,
-  "loginId": "urban_user",
-  "name": "김도시",
-  "phoneNumber": "01012345678",
-  "birthDate": "1990-05-20",
-  "address": "충청북도 청주시 상당구",
-  "userType": "URBAN_FARMER",
-  "accountStatus": "ACTIVE"
+  "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+  "tokenType": "Bearer",
+  "expiresInSeconds": 3600,
+  "user": {
+    "id": 15,
+    "loginId": "urban_user",
+    "name": "김도시",
+    "phoneNumber": "01012345678",
+    "birthDate": "1990-05-20",
+    "address": "충청북도 청주시 상당구",
+    "userType": "URBAN_FARMER",
+    "accountStatus": "ACTIVE"
+  }
 }
 ```
+
+회원가입 성공 직후 별도 로그인 없이 `accessToken`을 보호 API에 사용할 수 있다.
 
 ### 대표 오류
 
@@ -227,6 +238,7 @@ Query Parameter:
 ### 성공 응답
 
 - HTTP: `200 OK`
+- Body: 회원가입과 동일한 `TokenResponse`
 - JWT 서명: `HS256`
 - `sub`: 회원 ID 문자열
 - `role`: 회원 역할
@@ -269,7 +281,7 @@ Query Parameter:
 
 ### Postman 팁
 
-Tests 또는 Scripts에서 로그인 응답 토큰을 환경변수로 저장하면 이후 보호 API에서 재사용할 수 있다.
+Tests 또는 Scripts에서 회원가입 또는 로그인 응답 토큰을 환경변수로 저장하면 이후 보호 API에서 재사용할 수 있다.
 
 ```javascript
 const body = pm.response.json();

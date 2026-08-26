@@ -1,5 +1,6 @@
 package chungbuk.cityfarmerplus.common.storage;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -22,6 +23,11 @@ import java.util.HexFormat;
 import java.util.UUID;
 
 @Component
+@ConditionalOnProperty(
+        name = "app.file-storage.type",
+        havingValue = "local",
+        matchIfMissing = true
+)
 public class LocalFileStorage implements FileStorage {
 
     private final Path root;

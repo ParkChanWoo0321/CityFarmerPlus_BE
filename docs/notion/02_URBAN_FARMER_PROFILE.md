@@ -250,13 +250,13 @@ Authorization: Bearer {{accessToken}}
   "agriculturalBusinessRegistered": true,
   "experienceCount": 5,
   "notes": "농업경영체 등록 완료, 수확 작업 5회 경험",
-  "version": 0,
+  "version": 1,
   "createdAt": "2026-08-11T10:20:30.123Z",
-  "updatedAt": "2026-08-11T10:20:30.123Z"
+  "updatedAt": "2026-08-11T10:30:00.456Z"
 }
 ```
 
-현재 수정 서비스는 응답 DTO를 만든 뒤 트랜잭션 커밋 시점에 JPA flush를 수행한다. 따라서 수정 직후 응답의 `version`, `updatedAt`은 위 예시처럼 변경 전 값일 수 있다. 커밋 후 GET으로 다시 조회하면 증가한 `version`과 실제 수정 시각을 확인할 수 있다.
+수정 서비스는 변경 내용을 JPA flush한 뒤 응답 DTO를 만든다. 따라서 즉시 응답의 `version`은 실제 증가한 값이고 `updatedAt`도 이번 수정 시각이다.
 
 ### 대표 오류
 

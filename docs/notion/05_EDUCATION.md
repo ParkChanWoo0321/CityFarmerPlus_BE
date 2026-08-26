@@ -462,7 +462,7 @@ Content-Disposition: attachment; filename*=UTF-8''...
 | 개별 파일 최대 크기 | 10 MiB (`10,485,760` bytes) |
 | 한 요청의 파일 총합 | 30 MiB (`31,457,280` bytes) |
 | 원본 파일명 | 경로를 제거한 이름, UTF-8 최대 255 bytes, 제어문자 불가 |
-| Spring 수신 한도 | 파일당 12MB, 요청 전체 35MB |
+| Spring 수신 한도 | 파일당 12MB, 요청 전체 31MB |
 
 서버는 확장자만 보지 않고 실제 파일 시그니처를 함께 검사한다.
 
@@ -528,7 +528,7 @@ Postman form-data 예시:
 | 409 | `CONCURRENT_UPDATE_CONFLICT` | 잠금 경합 또는 동시 갱신 충돌 |
 | 410 | `EDUCATION_DOCUMENT_FILE_UNAVAILABLE` | 실제 파일이 삭제됐거나 읽을 수 없음 |
 | 413 | `EDUCATION_DOCUMENT_TOO_LARGE` | 개별 10 MiB 또는 총합 30 MiB 초과 |
-| 413 | `UPLOAD_REQUEST_TOO_LARGE` | Spring 수신 한도인 파일 12MB 또는 요청 35MB 초과 |
+| 413 | `UPLOAD_REQUEST_TOO_LARGE` | Spring 수신 한도인 파일 12MB 또는 요청 31MB 초과 |
 | 415 | `UNSUPPORTED_EDUCATION_DOCUMENT_TYPE` | 허용하지 않는 확장자 또는 확장자 없음 |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | multipart가 아니거나 `request` Part 형식이 지원되지 않음 |
 | 500 | `EDUCATION_DOCUMENT_STORAGE_FAILED` | 검증 후 파일 저장 실패 또는 저장 무결성 불일치 |

@@ -349,7 +349,7 @@ Content-Disposition: attachment; filename*=UTF-8''...
 | 개별 파일 최대 크기 | 10 MiB (`10,485,760` bytes) |
 | 한 요청의 파일 총합 | 30 MiB (`31,457,280` bytes) |
 | 원본 파일명 | 경로 제거 후 UTF-8 최대 255 bytes, 제어문자 불가 |
-| Spring 수신 한도 | 파일당 12MB, 요청 전체 35MB |
+| Spring 수신 한도 | 파일당 12MB, 요청 전체 31MB |
 
 서버는 다음 세 정보를 교차 검증한다.
 
@@ -420,7 +420,7 @@ Content-Disposition: attachment; filename*=UTF-8''...
 | 409 | `CONCURRENT_UPDATE_CONFLICT` | 사용자·프로필 잠금 또는 동시 갱신 충돌 |
 | 413 | `OWNERSHIP_DOCUMENT_TOO_LARGE` | 개별 파일 10 MiB 초과 |
 | 413 | `OWNERSHIP_DOCUMENTS_TOTAL_SIZE_TOO_LARGE` | 파일 총합 30 MiB 초과 |
-| 413 | `UPLOAD_REQUEST_TOO_LARGE` | Spring 수신 한도인 파일 12MB 또는 요청 35MB 초과 |
+| 413 | `UPLOAD_REQUEST_TOO_LARGE` | Spring 수신 한도인 파일 12MB 또는 요청 31MB 초과 |
 | 415 | `UNSUPPORTED_OWNERSHIP_DOCUMENT_TYPE` | 확장자가 없거나 허용 확장자가 아님 |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | 요청이 multipart/form-data가 아님 |
 | 500 | `OWNERSHIP_DOCUMENT_STORAGE_ERROR` | 저장 실패 또는 검증한 파일과 저장 결과 불일치 |

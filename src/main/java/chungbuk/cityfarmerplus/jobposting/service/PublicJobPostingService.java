@@ -156,7 +156,8 @@ public class PublicJobPostingService {
                 : PageRequest.of(page, size, Sort.by(
                 Sort.Order.asc("workDate"),
                 Sort.Order.asc("startTime"),
-                Sort.Order.desc("approvedAt")
+                Sort.Order.desc("approvedAt"),
+                Sort.Order.asc("id")
         ));
         if (resolvedStatus == PublicRecruitmentStatus.ALL) {
             specification = specification.and(
