@@ -65,7 +65,8 @@ class FarmHomeServiceTest {
         when(postingRepository.countByFarmProfileOwnerIdAndStatus(
                 eq(1L), any(JobPosting.JobPostingStatus.class)
         )).thenReturn(1L);
-        when(postingRepository.findTop5ByFarmProfileOwnerIdOrderByUpdatedAtDesc(1L))
+        when(postingRepository
+                .findTop5ByFarmProfileOwnerIdOrderByUpdatedAtDescIdDesc(1L))
                 .thenReturn(List.of());
         when(postingRepository.count(any(Specification.class))).thenReturn(2L);
         when(postingResponseAssembler.assembleAll(List.of())).thenReturn(List.of());

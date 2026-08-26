@@ -91,7 +91,8 @@ public class WorkAssignmentService {
                     userId,
                     PageRequest.of(page, size, Sort.by(
                             Sort.Order.desc("workDate"),
-                            Sort.Order.desc("startTime")
+                            Sort.Order.desc("startTime"),
+                            Sort.Order.desc("id")
                     ))
             );
             case UPCOMING -> {
@@ -139,7 +140,8 @@ public class WorkAssignmentService {
         FarmProfile farm = accessService.requireApprovedFarm(farmUserId);
         var pageable = PageRequest.of(page, size, Sort.by(
                 Sort.Order.desc("workDate"),
-                Sort.Order.desc("startTime")
+                Sort.Order.desc("startTime"),
+                Sort.Order.desc("id")
         ));
         return PageResponse.from(
                 assignmentRepository.findByFarmProfileId(farm.getId(), pageable),
@@ -158,7 +160,11 @@ public class WorkAssignmentService {
         JobPosting posting = postingRepository.findByIdForUpdate(snapshot.getJobPostingId())
                 .orElseThrow(JobPostingException::notFound);
         WorkAssignment assignment = getFarmOwnedAssignmentForUpdate(farm, assignmentId);
-        requireWorkStarted(assignment);
+        boolean sameAttendanceRetry = status != WorkAssignment.AttendanceStatus.NOT_RECORDED
+                && assignment.getAttendanceStatus() == status;
+        if (!sameAttendanceRetry) {
+            requireWorkStarted(assignment);
+        }
         User farmUser = farm.getOwner();
         try {
             assignment.recordAttendance(status, farmUser, clock.instant());
@@ -167,7 +173,9 @@ public class WorkAssignmentService {
         } catch (IllegalArgumentException exception) {
             throw WorkAssignmentException.invalidState(exception.getMessage());
         }
-        completePostingWhenAllAssignmentsResolved(posting);
+        if (!sameAttendanceRetry) {
+            completePostingWhenAllAssignmentsResolved(posting);
+        }
         return WorkAssignmentResponse.from(assignment);
     }
 

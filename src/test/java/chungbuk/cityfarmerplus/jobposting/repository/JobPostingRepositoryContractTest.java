@@ -33,4 +33,27 @@ class JobPostingRepositoryContractTest {
 
         assertThat(method.getAnnotation(Modifying.class)).isNotNull();
     }
+
+    @Test
+    void farmHomeRecentPostingsUseIdAsNewestFirstTieBreaker()
+            throws Exception {
+        Method method = JobPostingRepository.class.getMethod(
+                "findTop5ByFarmProfileOwnerIdOrderByUpdatedAtDescIdDesc",
+                Long.class
+        );
+
+        assertThat(method.getReturnType()).isEqualTo(java.util.List.class);
+    }
+
+    @Test
+    void statusTopFivePostingsUseIdAsApprovalTimeTieBreaker()
+            throws Exception {
+        Method method = JobPostingRepository.class.getMethod(
+                "findTop5ByStatusOrderByApprovedAtDescIdDesc",
+                chungbuk.cityfarmerplus.jobposting.entity.JobPosting
+                        .JobPostingStatus.class
+        );
+
+        assertThat(method.getReturnType()).isEqualTo(java.util.List.class);
+    }
 }

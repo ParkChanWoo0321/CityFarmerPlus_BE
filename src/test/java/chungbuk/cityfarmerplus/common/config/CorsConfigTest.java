@@ -33,5 +33,11 @@ class CorsConfigTest {
                 .contains(HttpHeaders.AUTHORIZATION, HttpHeaders.CONTENT_TYPE);
         assertThat(cors.getExposedHeaders()).contains(HttpHeaders.CONTENT_DISPOSITION);
         assertThat(cors.getAllowCredentials()).isFalse();
+
+        MockHttpServletRequest healthRequest = new MockHttpServletRequest(
+                "OPTIONS",
+                "/health"
+        );
+        assertThat(source.getCorsConfiguration(healthRequest)).isSameAs(cors);
     }
 }

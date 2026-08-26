@@ -2,8 +2,10 @@ package chungbuk.cityfarmerplus.jobposting.controller;
 
 import chungbuk.cityfarmerplus.auth.config.SecurityConfig;
 import chungbuk.cityfarmerplus.auth.exception.GlobalExceptionHandler;
+import chungbuk.cityfarmerplus.application.entity.JobApplication;
 import chungbuk.cityfarmerplus.common.region.ChungbukCityCounty;
 import chungbuk.cityfarmerplus.common.web.PageResponse;
+import chungbuk.cityfarmerplus.jobposting.dto.PublicJobApplicationSummary;
 import chungbuk.cityfarmerplus.jobposting.dto.PublicJobPostingResponse;
 import chungbuk.cityfarmerplus.jobposting.dto.PublicRecruitmentStatus;
 import chungbuk.cityfarmerplus.jobposting.entity.JobPosting;
@@ -27,6 +29,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -63,7 +66,7 @@ class PublicJobPostingControllerWebTest {
                 1,
                 10
         )).thenReturn(new PageResponse<>(
-                List.of(response()),
+                List.of(personalizedResponse()),
                 1,
                 10,
                 11,
@@ -87,6 +90,8 @@ class PublicJobPostingControllerWebTest {
                 .andExpect(jsonPath("$.content[0].farmName").value("Chungju farm"))
                 .andExpect(jsonPath("$.content[0].recruitmentStatus").value("OPEN"))
                 .andExpect(jsonPath("$.content[0].acceptingApplications").value(true))
+                .andExpect(jsonPath("$.content[0].myApplication.applicationId").value(501))
+                .andExpect(jsonPath("$.content[0].myApplication.status").value("APPLIED"))
                 .andExpect(jsonPath("$.page").value(1))
                 .andExpect(jsonPath("$.size").value(10));
 
@@ -171,17 +176,54 @@ class PublicJobPostingControllerWebTest {
     }
 
     @Test
-    void searchRequiresAuthentication() throws Exception {
-        mockMvc.perform(get(ENDPOINT).queryParam("keyword", "potato"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    void anonymousUserSearchesPostingsWithoutPersonalizedApplication() throws Exception {
+        when(service.getPostings(
+                null,
+                "potato",
+                null,
+                null,
+                null,
+                null,
+                null,
+                PublicRecruitmentStatus.OPEN,
+                0,
+                20
+        )).thenReturn(new PageResponse<>(List.of(response()), 0, 20, 1, 1, false));
 
-        verifyNoInteractions(service);
+        mockMvc.perform(get(ENDPOINT).queryParam("keyword", "potato"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(100))
+                .andExpect(jsonPath("$.content[0].myApplication").doesNotExist());
+
+        verify(service).getPostings(
+                null,
+                "potato",
+                null,
+                null,
+                null,
+                null,
+                null,
+                PublicRecruitmentStatus.OPEN,
+                0,
+                20
+        );
     }
 
     @Test
-    void detailRequiresAuthentication() throws Exception {
+    void anonymousUserReadsPostingDetailWithoutPersonalizedApplication() throws Exception {
+        when(service.getPosting(null, 100L, false)).thenReturn(response());
+
         mockMvc.perform(get(ENDPOINT + "/100"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(100))
+                .andExpect(jsonPath("$.myApplication").doesNotExist());
+
+        verify(service).getPosting(null, 100L, false);
+    }
+
+    @Test
+    void anonymousUserCannotApplyThroughPublicPostingPath() throws Exception {
+        mockMvc.perform(post(ENDPOINT + "/100/applications"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
 
@@ -189,6 +231,17 @@ class PublicJobPostingControllerWebTest {
     }
 
     private PublicJobPostingResponse response() {
+        return response(null);
+    }
+
+    private PublicJobPostingResponse personalizedResponse() {
+        return response(new PublicJobApplicationSummary(
+                501L,
+                JobApplication.ApplicationStatus.APPLIED
+        ));
+    }
+
+    private PublicJobPostingResponse response(PublicJobApplicationSummary myApplication) {
         return new PublicJobPostingResponse(
                 100L,
                 10L,
@@ -213,7 +266,7 @@ class PublicJobPostingControllerWebTest {
                 Instant.parse("2026-08-11T01:00:00Z"),
                 PublicRecruitmentStatus.OPEN,
                 true,
-                null
+                myApplication
         );
     }
 

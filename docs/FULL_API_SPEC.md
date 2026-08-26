@@ -1,6 +1,6 @@
 # CityFarmerPlus 전체 API 명세
 
-- 문서 기준일: 2026-08-20
+- 문서 기준일: 2026-08-26
 - 기준: 현재 저장소의 Controller, DTO, Security, Service 상태 검증 코드
 - 현재 HTTP 작업 수: 66개
 - 로컬 기본 URL: http://localhost:8080
@@ -42,9 +42,13 @@ Authorization: Bearer {{accessToken}}
 | GET | /api/auth/check-id |
 | POST | /api/auth/login |
 | GET | /api/education/courses |
-| OPTIONS | 전체 경로 |
+| GET | /api/job-postings |
+| GET | /api/job-postings/{postingId} |
+| GET | /api/support/faqs |
+| GET | /health |
+| OPTIONS | /api/**, /health |
 
-위 표 이외의 API는 Bearer JWT가 필요하다. 이름이 `PublicJobPostingController`인 공고 조회와 FAQ도 현재 Security 설정상 인증이 필요하다.
+위 표 이외의 API는 Bearer JWT가 필요하다. 공개 공고 조회는 JWT 없이 호출할 수 있고, 유효한 JWT를 함께 보내면 현재 사용자의 지원 정보가 응답에 추가된다. 공개 API라도 잘못된 Bearer JWT를 보내면 401을 반환한다.
 
 ### 1.2 Content-Type
 
@@ -85,15 +89,20 @@ page와 size를 직접 받는 API는 기본 page=0, size=20이며 size는 1~100�
 | 400 | VALIDATION_ERROR | DTO 또는 Query Parameter 검증 실패 |
 | 400 | INVALID_REQUEST | 읽을 수 없는 JSON |
 | 400 | INVALID_REQUEST_PARAMETER | Enum, 날짜 등 파라미터 형식 오류 |
+| 400 | MISSING_REQUEST_PARAMETER | 필수 Query Parameter 누락 |
 | 400 | MISSING_MULTIPART_PART | 필수 multipart 파트 누락 |
+| 400 | INVALID_ARGUMENT | 처리 중 발견한 잘못된 요청 값 |
 | 401 | UNAUTHORIZED | JWT 누락, 만료 또는 위조 |
 | 401 | INVALID_ACCOUNT | 탈퇴·정지 계정 또는 토큰 역할 불일치 |
 | 403 | ACCESS_DENIED | 역할 권한 부족 |
 | 404 | 도메인별 NOT_FOUND | 대상 데이터가 없음 |
+| 404 | RESOURCE_NOT_FOUND | 매핑되지 않은 URL |
 | 409 | DATA_CONFLICT | 중복 데이터 또는 DB 무결성 충돌 |
 | 409 | CONCURRENT_UPDATE_CONFLICT | 다른 요청이 먼저 상태를 변경함 |
+| 409 | INVALID_STATE | 현재 상태에서 수행할 수 없는 요청 |
 | 413 | UPLOAD_REQUEST_TOO_LARGE | 서버 multipart 수신 한도 초과 |
 | 415 | UNSUPPORTED_MEDIA_TYPE | 요청 Content-Type 오류 |
+| 500 | INTERNAL_SERVER_ERROR | 예상하지 못한 서버 오류. 내부 상세는 응답하지 않음 |
 
 ### 1.5 공통 Enum
 
@@ -111,7 +120,7 @@ CHEONGJU, CHUNGJU, JECHEON, BOEUN, OKCHEON, YEONGDONG, JEUNGPYEONG, JINCHEON, GO
 
 | 기능 | Method | URL | 권한 | 요청 | 성공 |
 |---|---|---|---|---|---|
-| 회원가입 | POST | /api/auth/signup | 공개 | JSON SignupRequest | 201 UserResponse |
+| 회원가입 | POST | /api/auth/signup | 공개 | JSON SignupRequest | 201 TokenResponse |
 | 아이디 중복 확인 | GET | /api/auth/check-id?loginId= | 공개 | Query | 200 LoginIdAvailabilityResponse |
 | 로그인 | POST | /api/auth/login | 공개 | JSON LoginRequest | 200 TokenResponse |
 | 내 회원 정보 | GET | /api/auth/me | 활성 계정 | 없음 | 200 UserResponse |
@@ -151,6 +160,28 @@ id, loginId, name, phoneNumber, birthDate, address, userType, accountStatus
 TokenResponse:
 
 accessToken, tokenType=Bearer, expiresInSeconds, user
+
+회원가입과 로그인은 같은 `TokenResponse` 본문을 반환한다. 회원가입은 `201 Created`, 로그인은 `200 OK`이며, 회원가입 성공 직후 발급된 JWT를 별도 로그인 없이 보호 API에 사용할 수 있다.
+
+회원가입 성공 응답 예시:
+
+~~~json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+  "tokenType": "Bearer",
+  "expiresInSeconds": 3600,
+  "user": {
+    "id": 1,
+    "loginId": "farm_user",
+    "name": "농가 사용자",
+    "phoneNumber": "01012345678",
+    "birthDate": "1985-03-12",
+    "address": "충청북도 충주시",
+    "userType": "FARM",
+    "accountStatus": "ACTIVE"
+  }
+}
+~~~
 
 회원 상태는 ACTIVE, SUSPENDED, WITHDRAWN이다. 공개 회원가입 직후에는 ACTIVE다. 탈퇴는 ACTIVE 계정에서 현재 비밀번호를 다시 확인한 뒤 처리한다. 같은 DB 트랜잭션에 교육·농가 소유 증빙 파일 삭제 작업을 기록하고 계정을 WITHDRAWN으로 변경하며, 커밋 직후 삭제가 실패해도 백그라운드 작업이 재시도한다.
 
@@ -444,7 +475,7 @@ APPROVED, REJECTED와 reviewerId, reviewerName, reviewedAt, rejectionReason은 b
 | 파일당 크기 | 최대 10 MiB |
 | 파일 합계 | 최대 30 MiB |
 | Spring 파일 수신 한도 | 파일당 12MB |
-| Spring 요청 수신 한도 | 요청당 35MB |
+| Spring 요청 수신 한도 | 요청당 31MB |
 
 확장자와 선언 MIME만 보지 않고 실제 파일 시그니처와 읽은 바이트 수를 검증한다. 다운로드 응답은 Content-Disposition: attachment와 UTF-8 파일명을 사용한다. 회원 탈퇴 시 해당 회원의 교육 또는 농가 소유 증빙 저장 파일은 삭제 작업으로 등록되며, 실패 작업은 기본 60초 주기로 재시도한다. 탈퇴한 소유자의 문서는 물리 삭제 재시도 중에도 API로 다운로드할 수 없다.
 
@@ -521,12 +552,14 @@ PENDING_REVIEW 이후 승인·반려·마감 처리와 `JobPostingReview`의 관
 
 | 기능 | Method | URL | 권한 | Query | 성공 |
 |---|---|---|---|---|---|
-| 모집 중·마감 목록 | GET | /api/job-postings | 활성 계정 | keyword, region, crop, dateFrom, dateTo, workType, recruitmentStatus, page, size | 200 Page |
-| 공개 공고 상세 | GET | /api/job-postings/{postingId} | 활성 계정 | includeClosed | 200 |
+| 모집 중·마감 목록 | GET | /api/job-postings | 공개, JWT 선택 | keyword, region, crop, dateFrom, dateTo, workType, recruitmentStatus, page, size | 200 Page |
+| 공개 공고 상세 | GET | /api/job-postings/{postingId} | 공개, JWT 선택 | includeClosed | 200 |
 
 PublicJobPostingResponse:
 
 id, farmProfileId, farmName, cityCounty, crop, workType, workDate, startTime, endTime, capacity, meetingPlace, wageAmount, wageUnit, supplies, precautions, farmMessage, applicantPreference, title, description, beginnerGuide, approvedAt, recruitmentStatus, acceptingApplications, myApplication
+
+익명 요청의 `myApplication`은 `null`이다. 유효한 JWT를 보낸 요청은 해당 사용자의 지원 이력이 있을 때 `applicationId`와 현재 지원 `status`를 반환한다.
 
 `recruitmentStatus` 쿼리는 `OPEN`, `CLOSED`, `ALL`이며 기본값은 `OPEN`이다. `CLOSED`에는 DB 상태가 `CLOSED`·`WORK_COMPLETED`인 공고와 작업 시작 시각이 지난 `OPEN` 공고가 포함된다. `ALL`은 모집 중 공고를 먼저 정렬한다. `crop`은 정확 일치 필터이며, keyword는 제목·작물·작업 종류·농가명·집결 장소·지역 enum/한국어명을 부분검색한다.
 
@@ -636,12 +669,14 @@ workAssignmentId, workSummary, officialPrecautions, preparationChecklist, recomm
 | 기능 | Method | URL | 권한 | 요청 | 성공 |
 |---|---|---|---|---|---|
 | 내 농가 배정 목록 | GET | /api/farm/work-assignments | 승인된 FARM | page, size | 200 Page |
-| 출결 최초 등록 | PUT | /api/farm/work-assignments/{assignmentId}/attendance | 승인된 FARM 소유자 | status | 200 |
+| 출결 등록·동일 값 재시도 | PUT | /api/farm/work-assignments/{assignmentId}/attendance | 승인된 FARM 소유자 | status | 200 |
 | 근무 완료 확정 | POST | /api/farm/work-assignments/{assignmentId}/complete | 승인된 FARM 소유자 | 없음 | 200 |
 
 - 출결은 작업 시작 시각 이후에만 등록할 수 있다.
 - status는 PRESENT 또는 ABSENT다. NOT_RECORDED 요청은 거절된다.
-- 농가는 최초 출결만 등록할 수 있다. backend-1에는 이후 출결 정정 API가 없다.
+- 최초 등록은 `SCHEDULED` + `NOT_RECORDED`에서만 상태를 변경한다.
+- 같은 농가 소유자가 이미 등록된 것과 같은 `PRESENT`/`ABSENT`를 재시도하면 `200`과 현재 배정을 반환한다. 출결·근무·지원 상태와 기존 기록 시각·기록자는 변경하지 않는다.
+- 이미 등록된 값과 다른 상태로의 변경 요청은 `INVALID_WORK_ASSIGNMENT_STATE`(409)다. backend-1에는 출결 정정 API가 없다.
 - ABSENT 등록 시 배정은 NO_SHOW, 지원은 NO_SHOW가 된다.
 - 근무 완료는 작업 종료 시각 이후이고 PRESENT인 SCHEDULED 배정만 가능하다.
 
@@ -686,7 +721,7 @@ farmProfile, postingCounts(DB 공고 상태별 개수), displayPostingCounts(화
 
 | 기능 | Method | URL | 권한 | 요청 | 성공 |
 |---|---|---|---|---|---|
-| FAQ 목록 | GET | /api/support/faqs | 활성 계정 | 없음 | 200 List |
+| FAQ 목록 | GET | /api/support/faqs | 공개 | 없음 | 200 List |
 | 상담 메시지 전송 | POST | /api/ai/support/messages | 활성 계정 | message 1~1000자 | 200 |
 | 내 상담 이력 | GET | /api/ai/support/messages | 활성 계정 | page, size | 200 Page |
 

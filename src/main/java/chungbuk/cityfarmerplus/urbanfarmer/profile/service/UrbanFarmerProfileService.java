@@ -59,6 +59,7 @@ public class UrbanFarmerProfileService {
                 request.experienceCount(),
                 normalizeNullable(request.notes())
         );
+        profileRepository.flush();
         return UrbanFarmerProfileResponse.from(profile);
     }
 

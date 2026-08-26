@@ -17,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
@@ -106,6 +107,17 @@ class FarmJobPostingServiceTest {
         assertThat(response.content()).isEmpty();
         verify(accessService).requireFarmProfile(1L);
         verify(accessService, never()).requireApprovedFarm(1L);
+        ArgumentCaptor<Pageable> pageableCaptor =
+                ArgumentCaptor.forClass(Pageable.class);
+        verify(postingRepository).findAll(
+                any(Specification.class),
+                pageableCaptor.capture()
+        );
+        assertThat(pageableCaptor.getValue().getSort().toList())
+                .containsExactly(
+                        Sort.Order.desc("createdAt"),
+                        Sort.Order.desc("id")
+                );
     }
 
     @Test

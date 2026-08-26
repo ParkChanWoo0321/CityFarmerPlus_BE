@@ -130,7 +130,10 @@ public class JobApplicationService {
             int size
     ) {
         requireActiveUrbanFarmer(userId);
-        var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        var pageable = PageRequest.of(page, size, Sort.by(
+                Sort.Order.desc("createdAt"),
+                Sort.Order.desc("id")
+        ));
         return PageResponse.from(
                 applicationRepository.findByUrbanFarmerId(userId, pageable),
                 JobApplicationResponse::from

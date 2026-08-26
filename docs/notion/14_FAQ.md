@@ -13,9 +13,8 @@
 
 ## 인증
 
-- 컨트롤러에 역할 제한은 없다.
-- 그러나 현재 `SecurityConfig` 기준으로 FAQ URL이 `permitAll` 대상이 아니므로 **JWT는 필수**다.
-- 어떤 역할이든 활성 회원이면 호출할 수 있다.
+- `SecurityConfig`의 공개 조회 대상이므로 JWT 없이 호출할 수 있다.
+- Authorization 헤더를 보냈다면 JWT와 현재 계정 상태를 정상 검증한다.
 
 ## FAQ 목록 조회
 
@@ -79,8 +78,8 @@
 | HTTP | `code` | 조건 |
 |---:|---|---|
 | 200 | - | FAQ 목록 조회 성공 |
-| 401 | `UNAUTHORIZED` | JWT 누락·만료·무효 |
-| 401 | `INVALID_ACCOUNT` | JWT 사용자/역할과 현재 DB 계정이 불일치 |
+| 401 | `UNAUTHORIZED` | 선택적으로 보낸 JWT가 만료·위조됨 |
+| 401 | `INVALID_ACCOUNT` | 선택적으로 보낸 JWT 사용자/역할과 현재 DB 계정이 불일치 |
 
 오류 형식:
 
@@ -94,15 +93,14 @@
 ## Postman 예시
 
 ```bash
-curl "http://localhost:8080/api/support/faqs" \
-  -H "Authorization: Bearer {{accessToken}}"
+curl "http://localhost:8080/api/support/faqs"
 ```
 
 Postman:
 
 1. Method `GET`
 2. URL `http://localhost:8080/api/support/faqs`
-3. Authorization → Bearer Token → `{{accessToken}}`
+3. Authorization → `No Auth`
 4. Body 없음
 
 ## 현재 제한과 `backend-2` 경계
@@ -111,4 +109,4 @@ Postman:
 - 카테고리 필터, 검색, 페이징이 없다.
 - FAQ의 “담당자”는 농가/공고/교육 승인과 매칭을 담당하는 `backend-2` 중개센터 기능을 뜻한다.
 - 이 API 자체에는 중개센터 전용 작업이 없다.
-- 비회원에게 FAQ를 공개해야 한다면 `SecurityConfig` 변경이 필요하다. 현재 코드는 익명 조회를 보장하지 않는다.
+- FAQ 등록·수정·삭제 API는 현재 제공하지 않는다.

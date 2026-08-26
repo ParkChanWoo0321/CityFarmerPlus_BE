@@ -30,6 +30,26 @@ class WorkAssignmentRepositoryContractTest {
                 .contains("assignment.workDate > :today")
                 .contains("assignment.workDate = :today and assignment.endTime > :now")
                 .contains("assignment.workDate asc")
-                .contains("assignment.startTime asc");
+                .contains("assignment.startTime asc")
+                .contains("assignment.id asc");
+    }
+
+    @Test
+    void urbanFarmerHomeUpcomingQueryHasStableIdTieBreaker()
+            throws NoSuchMethodException {
+        Method method = WorkAssignmentRepository.class.getMethod(
+                "findUpcomingByUrbanFarmerId",
+                Long.class,
+                LocalDate.class,
+                LocalTime.class,
+                Pageable.class
+        );
+
+        Query query = method.getAnnotation(Query.class);
+        assertThat(query).isNotNull();
+        assertThat(query.value())
+                .contains("assignment.workDate asc")
+                .contains("assignment.startTime asc")
+                .contains("assignment.id asc");
     }
 }

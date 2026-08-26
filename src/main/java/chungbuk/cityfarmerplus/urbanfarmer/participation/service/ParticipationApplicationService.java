@@ -87,6 +87,7 @@ public class ParticipationApplicationService {
         } catch (IllegalStateException exception) {
             throw invalidState(exception.getMessage());
         }
+        applicationRepository.flush();
         return ParticipationApplicationResponse.from(application);
     }
 
@@ -109,6 +110,7 @@ public class ParticipationApplicationService {
         } catch (IllegalStateException exception) {
             throw invalidState(exception.getMessage());
         }
+        applicationRepository.flush();
         return ParticipationApplicationResponse.from(application);
     }
 
@@ -121,6 +123,7 @@ public class ParticipationApplicationService {
         } catch (IllegalStateException exception) {
             throw invalidState(exception.getMessage());
         }
+        applicationRepository.flush();
         return ParticipationApplicationResponse.from(application);
     }
 

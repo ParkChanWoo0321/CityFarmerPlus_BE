@@ -21,6 +21,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -107,9 +108,16 @@ class ParticipationApplicationServiceTest {
     void editingRejectedApplicationReturnsItToDraftAndClearsReviewState() {
         User owner = urbanFarmer(21L);
         ParticipationApplication application = rejectedApplication(owner, 100L);
+        Instant flushedAt = Instant.parse("2026-08-15T03:00:00Z");
+        ReflectionTestUtils.setField(application, "version", 2L);
         when(accessService.requireUrbanFarmerForUpdate(21L)).thenReturn(owner);
         when(applicationRepository.findByIdAndUrbanFarmerId(100L, 21L))
                 .thenReturn(Optional.of(application));
+        doAnswer(invocation -> {
+            ReflectionTestUtils.setField(application, "version", 3L);
+            ReflectionTestUtils.setField(application, "updatedAt", flushedAt);
+            return null;
+        }).when(applicationRepository).flush();
 
         var response = applicationService.update(
                 21L,
@@ -123,6 +131,57 @@ class ParticipationApplicationServiceTest {
         assertThat(response.rejectionReason()).isNull();
         assertThat(response.reviewedByUserId()).isNull();
         assertThat(response.reviewedAt()).isNull();
+        assertThat(response.version()).isEqualTo(3L);
+        assertThat(response.updatedAt()).isEqualTo(flushedAt);
+        verify(applicationRepository).flush();
+    }
+
+    @Test
+    void submitReturnsVersionAndUpdatedAtProducedByFlush() {
+        User owner = urbanFarmer(21L);
+        ParticipationApplication application = draftApplication(owner, 100L);
+        Instant flushedAt = Instant.parse("2026-08-15T01:00:01Z");
+        when(accessService.requireUrbanFarmerForUpdate(21L)).thenReturn(owner);
+        when(applicationRepository.findByIdAndUrbanFarmerId(100L, 21L))
+                .thenReturn(Optional.of(application));
+        doAnswer(invocation -> {
+            ReflectionTestUtils.setField(application, "version", 1L);
+            ReflectionTestUtils.setField(application, "updatedAt", flushedAt);
+            return null;
+        }).when(applicationRepository).flush();
+
+        var response = applicationService.submit(21L, 100L);
+
+        assertThat(response.status())
+                .isEqualTo(ParticipationApplication.ParticipationStatus.SUBMITTED);
+        assertThat(response.version()).isEqualTo(1L);
+        assertThat(response.updatedAt()).isEqualTo(flushedAt);
+        verify(applicationRepository).flush();
+    }
+
+    @Test
+    void cancelReturnsVersionAndUpdatedAtProducedByFlush() {
+        User owner = urbanFarmer(21L);
+        ParticipationApplication application = draftApplication(owner, 100L);
+        application.submit(Instant.parse("2026-08-15T01:00:00Z"));
+        Instant flushedAt = Instant.parse("2026-08-15T02:00:01Z");
+        ReflectionTestUtils.setField(application, "version", 1L);
+        when(accessService.requireUrbanFarmerForUpdate(21L)).thenReturn(owner);
+        when(applicationRepository.findByIdAndUrbanFarmerId(100L, 21L))
+                .thenReturn(Optional.of(application));
+        doAnswer(invocation -> {
+            ReflectionTestUtils.setField(application, "version", 2L);
+            ReflectionTestUtils.setField(application, "updatedAt", flushedAt);
+            return null;
+        }).when(applicationRepository).flush();
+
+        var response = applicationService.cancel(21L, 100L);
+
+        assertThat(response.status())
+                .isEqualTo(ParticipationApplication.ParticipationStatus.CANCELLED);
+        assertThat(response.version()).isEqualTo(2L);
+        assertThat(response.updatedAt()).isEqualTo(flushedAt);
+        verify(applicationRepository).flush();
     }
 
     @Test

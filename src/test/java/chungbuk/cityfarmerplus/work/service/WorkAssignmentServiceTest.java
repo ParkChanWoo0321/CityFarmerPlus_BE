@@ -72,7 +72,8 @@ class WorkAssignmentServiceTest {
         givenActiveUrbanFarmer(1L);
         var pageable = PageRequest.of(2, 10, Sort.by(
                 Sort.Order.desc("workDate"),
-                Sort.Order.desc("startTime")
+                Sort.Order.desc("startTime"),
+                Sort.Order.desc("id")
         ));
         when(assignmentRepository.findByUrbanFarmerId(1L, pageable))
                 .thenReturn(Page.<WorkAssignment>empty(pageable));
@@ -80,6 +81,24 @@ class WorkAssignmentServiceTest {
         service.getUrbanFarmerAssignments(1L, WorkAssignmentView.ALL, 2, 10);
 
         verify(assignmentRepository).findByUrbanFarmerId(1L, pageable);
+    }
+
+    @Test
+    void farmAssignmentsUseStableDescendingTimelineOrder() {
+        FarmProfile farm = mock(FarmProfile.class);
+        var pageable = PageRequest.of(1, 10, Sort.by(
+                Sort.Order.desc("workDate"),
+                Sort.Order.desc("startTime"),
+                Sort.Order.desc("id")
+        ));
+        when(accessService.requireApprovedFarm(1L)).thenReturn(farm);
+        when(farm.getId()).thenReturn(5L);
+        when(assignmentRepository.findByFarmProfileId(5L, pageable))
+                .thenReturn(Page.empty(pageable));
+
+        service.getFarmAssignments(1L, 1, 10);
+
+        verify(assignmentRepository).findByFarmProfileId(5L, pageable);
     }
 
     @Test
@@ -192,6 +211,46 @@ class WorkAssignmentServiceTest {
                 WorkAssignment.AttendanceStatus.PRESENT,
                 farmOwner,
                 FIXED_CLOCK.instant()
+        );
+    }
+
+    @Test
+    void retryingSameAttendanceReturnsCurrentAssignmentWithoutStateTransition() {
+        FarmProfile farm = mock(FarmProfile.class);
+        WorkAssignment assignment = mock(WorkAssignment.class);
+        JobPosting posting = mock(JobPosting.class);
+        JobApplication application = mock(JobApplication.class);
+        User urbanFarmer = mock(User.class);
+        User farmOwner = mock(User.class);
+
+        when(accessService.requireApprovedFarmForUpdate(1L)).thenReturn(farm);
+        when(farm.getId()).thenReturn(5L);
+        when(farm.getOwner()).thenReturn(farmOwner);
+        when(assignmentRepository.findById(10L)).thenReturn(Optional.of(assignment));
+        when(assignmentRepository.findByIdForUpdate(10L))
+                .thenReturn(Optional.of(assignment));
+        when(assignment.getFarmProfileId()).thenReturn(5L);
+        when(assignment.getJobPostingId()).thenReturn(20L);
+        when(assignment.getAttendanceStatus())
+                .thenReturn(WorkAssignment.AttendanceStatus.ABSENT);
+        when(assignment.getJobApplication()).thenReturn(application);
+        when(assignment.getUrbanFarmer()).thenReturn(urbanFarmer);
+        when(postingRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(posting));
+
+        service.recordAttendance(
+                1L,
+                10L,
+                WorkAssignment.AttendanceStatus.ABSENT
+        );
+
+        verify(assignment).recordAttendance(
+                WorkAssignment.AttendanceStatus.ABSENT,
+                farmOwner,
+                FIXED_CLOCK.instant()
+        );
+        verify(assignmentRepository, never()).countByJobPostingIdAndStatus(
+                any(),
+                any()
         );
     }
 

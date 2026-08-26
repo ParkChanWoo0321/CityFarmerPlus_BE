@@ -57,6 +57,39 @@ class AuthControllerWebTest {
     private JwtDecoder jwtDecoder;
 
     @Test
+    void signupCreatesUserAndReturnsBearerAccessToken() throws Exception {
+        UserResponse user = new UserResponse(
+                21L,
+                "urban_user",
+                "도시농부",
+                null,
+                null,
+                null,
+                User.UserType.URBAN_FARMER,
+                User.AccountStatus.ACTIVE
+        );
+        when(authService.signup(any(SignupRequest.class))).thenReturn(user);
+        when(jwtTokenProvider.issueAccessToken(21L, User.UserType.URBAN_FARMER))
+                .thenReturn(new JwtTokenProvider.IssuedAccessToken("signup-jwt", 3600L));
+
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .characterEncoding("UTF-8")
+                        .content(signupJson("password123!")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.accessToken").value("signup-jwt"))
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.expiresInSeconds").value(3600))
+                .andExpect(jsonPath("$.user.id").value(21))
+                .andExpect(jsonPath("$.user.loginId").value("urban_user"))
+                .andExpect(jsonPath("$.user.userType").value("URBAN_FARMER"))
+                .andExpect(jsonPath("$.user.accountStatus").value("ACTIVE"));
+
+        verify(authService).signup(any(SignupRequest.class));
+        verify(jwtTokenProvider).issueAccessToken(21L, User.UserType.URBAN_FARMER);
+    }
+
+    @Test
     void authenticatedUserUpdatesEditableProfileFields() throws Exception {
         when(jwtDecoder.decode("urban-jwt")).thenReturn(jwt("15", "URBAN_FARMER"));
         when(authService.updateProfile(

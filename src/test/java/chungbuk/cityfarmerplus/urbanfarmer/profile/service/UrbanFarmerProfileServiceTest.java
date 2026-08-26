@@ -13,11 +13,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Instant;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -81,6 +84,43 @@ class UrbanFarmerProfileServiceTest {
                 .isInstanceOf(DomainException.class)
                 .extracting("code")
                 .isEqualTo("URBAN_FARMER_PROFILE_NOT_FOUND");
+    }
+
+    @Test
+    void updateReturnsVersionAndUpdatedAtProducedByFlush() {
+        User user = urbanFarmer(1L);
+        UrbanFarmerProfile profile = UrbanFarmerProfile.create(
+                user,
+                false,
+                3,
+                "기존 경험"
+        );
+        Instant createdAt = Instant.parse("2026-08-15T00:00:00Z");
+        Instant flushedAt = Instant.parse("2026-08-15T01:00:00Z");
+        ReflectionTestUtils.setField(profile, "id", 10L);
+        ReflectionTestUtils.setField(profile, "version", 4L);
+        ReflectionTestUtils.setField(profile, "createdAt", createdAt);
+        ReflectionTestUtils.setField(profile, "updatedAt", createdAt);
+        when(accessService.requireUrbanFarmerForUpdate(1L)).thenReturn(user);
+        when(profileRepository.findByUrbanFarmerId(1L))
+                .thenReturn(Optional.of(profile));
+        doAnswer(invocation -> {
+            ReflectionTestUtils.setField(profile, "version", 5L);
+            ReflectionTestUtils.setField(profile, "updatedAt", flushedAt);
+            return null;
+        }).when(profileRepository).flush();
+
+        var response = profileService.update(
+                1L,
+                new UrbanFarmerProfileRequest(true, 5, "  갱신된 경험  ")
+        );
+
+        assertThat(response.agriculturalBusinessRegistered()).isTrue();
+        assertThat(response.experienceCount()).isEqualTo(5);
+        assertThat(response.notes()).isEqualTo("갱신된 경험");
+        assertThat(response.version()).isEqualTo(5L);
+        assertThat(response.updatedAt()).isEqualTo(flushedAt);
+        verify(profileRepository).flush();
     }
 
     private User urbanFarmer(Long id) {

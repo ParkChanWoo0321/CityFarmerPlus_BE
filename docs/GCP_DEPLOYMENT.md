@@ -64,6 +64,8 @@ Cloud Run은 `PORT`를 주입한다. 애플리케이션은 `0.0.0.0:${PORT}`에 
 | `GCS_PREFIX` | Cloud Run env | 예: `cityfarmerplus/prod` |
 | `DB_POOL_MAX_SIZE` | Cloud Run env | 기본 `5` |
 | `DB_POOL_MIN_IDLE` | Cloud Run env | 기본 `0` |
+| `DB_CONNECTION_TIMEOUT` | Cloud Run env | DB 연결 1회 제한 `10000`ms |
+| `DB_POOL_INITIALIZATION_FAIL_TIMEOUT` | Cloud Run env | 기동 시 DB/DNS 복구를 최대 `60000`ms 재시도 |
 | `JPA_DDL_AUTO` | Cloud Run env | 운영 외부 DB에서는 `validate` |
 
 서비스 계정 JSON 키를 만들거나 `GOOGLE_APPLICATION_CREDENTIALS` 파일을 배포하지 않는다. Cloud Run 런타임 서비스 계정에 bucket 권한을 부여하면 Google Cloud Storage Java client가 ADC로 인증한다.
@@ -76,7 +78,6 @@ Cloud Run은 `PORT`를 주입한다. 애플리케이션은 `0.0.0.0:${PORT}`에 
 4. `main`에 배포할 변경이 커밋·푸시되어 있어야 한다.
 5. 실제 DB/JWT 값은 채팅, Git, 문서에 붙여 넣지 않고 사용자가 Cloud Shell 또는 GCP Console에 직접 입력한다.
 6. 외부 MySQL을 백업하고 현재 스키마와 애플리케이션 엔티티가 맞는지 확인한다. 운영 DB에는 `ddl-auto=update`를 사용하지 않는다.
-7. Render의 로컬 파일 개수와 보존 필요 여부를 확인한다. 파일이 있으면 GCS 이전이 끝날 때까지 Render를 삭제하지 않는다.
 
 로컬 PC에 `gcloud`가 없다면 무료 Cloud Shell에서 아래 명령을 실행할 수 있다.
 
@@ -246,7 +247,7 @@ JWT_SECRET_VERSION="${JWT_SECRET_VERSION##*/}"
 unset VALUE
 ```
 
-무중단 전환이 목적이면 JWT secret은 Render와 같은 값을 입력한다. 새 값으로 바꾸면 기존 로그인 token이 모두 무효가 된다. 새 version으로 회전할 때는 `versions add` → Cloud Run 참조 변경 → smoke test → 구 version disable 순서를 지킨다.
+기존 로그인 token을 유지해야 한다면 운영 환경에서 사용 중인 JWT secret을 그대로 입력한다. 새 값으로 바꾸면 기존 로그인 token이 모두 무효가 된다. 새 version으로 회전할 때는 `versions add` → Cloud Run 참조 변경 → smoke test → 구 version disable 순서를 지킨다.
 
 런타임 서비스 계정에는 필요한 secret만 읽을 수 있게 부여한다.
 
@@ -291,7 +292,7 @@ gcloud builds submit . \
 
 수동 build에서는 `cloudbuild.yaml`의 기본값인 `_TAG=bootstrap`, `_DEPLOY=false`가 적용되어 이미지만 push하고 아직 존재하지 않는 Cloud Run service 갱신은 건너뛴다.
 
-비밀이 아닌 설정은 YAML 파일로 전달한다. 쉼표로 구분된 여러 CORS Origin도 안전하게 전달할 수 있다. 예제 파일을 `/tmp`에 복사하고 `YOUR_...` 값을 실제 값으로 직접 바꾼다. `JWT_ISSUER`도 무중단 전환이면 Render의 기존 값을 유지한다. `CORS_ALLOWED_ORIGINS`에는 경로가 아닌 `https://host` 형식만 넣는다.
+비밀이 아닌 설정은 YAML 파일로 전달한다. 쉼표로 구분된 여러 CORS Origin도 안전하게 전달할 수 있다. 예제 파일을 `/tmp`에 복사하고 `YOUR_...` 값을 실제 값으로 직접 바꾼다. 기존 token을 유지해야 한다면 운영 중인 `JWT_ISSUER` 값을 유지한다. `CORS_ALLOWED_ORIGINS`에는 경로가 아닌 `https://host` 형식만 넣는다.
 
 ```bash
 cp gcp/cloud-run.env.yaml.example /tmp/cityfarmerplus-cloud-run.env.yaml
@@ -357,7 +358,7 @@ bash gcp/deploy.sh
 1. 브랜치가 `main`인지 확인한다.
 2. 전체 Gradle 테스트를 실행한다.
 3. Docker 이미지를 빌드하고 Artifact Registry에 push한다.
-4. 이미 만들어진 Cloud Run 서비스의 이미지만 갱신한다.
+4. 이미 만들어진 Cloud Run 서비스의 이미지와 허용 프론트 Origin을 갱신한다.
 
 따라서 최초 Cloud Run 서비스와 환경 변수·secret·서비스 계정은 8절에서 먼저 만들어야 한다.
 
@@ -379,6 +380,7 @@ Cloud Build trigger는 GCP Console에서 다음 값으로 만든다.
 | `_SERVICE` | `cityfarmerplus-api` |
 | `_TAG` | `$SHORT_SHA` |
 | `_DEPLOY` | `true` |
+| `_CORS_ALLOWED_ORIGINS` | 로컬 연동 중에는 `http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000`, 프론트 배포 후에는 실제 Origin 목록 |
 
 Trigger 위치와 배포 위치는 서로 다르다. Trigger는 별도 private pool이 필요 없는 `global` 기본 pool에서 실행하고, `_REGION=us-west1`을 통해 Artifact Registry와 Cloud Run은 `us-west1`에 배포한다.
 
@@ -390,26 +392,11 @@ trigger가 사용하는 build 서비스 계정은 6절에서 만든 전용 계�
 - Cloud Build Editor
 - 런타임 서비스 계정에 대한 Service Account User
 
-GitHub 연결과 IAM 변경을 마친 뒤 `main` push로 한 번 실행하고, 테스트·이미지 push·Cloud Run revision 배포가 모두 성공했는지 확인한다.
+GitHub 연결과 IAM 변경을 마친 뒤 `main` push로 한 번 실행하고, 테스트·이미지 push·Cloud Run revision 배포가 모두 성공했는지 확인한다. `_CORS_ALLOWED_ORIGINS`는 경로가 없는 정확한 Origin만 넣으며, 삭제된 프론트 주소를 남겨 두지 않는다.
 
-## 10. Render 로컬 파일 이전
+## 10. 운영 Smoke Test
 
-기존 Render 서비스는 `FILE_STORAGE_TYPE=local`을 사용했다. DB에는 `storageKey`가 있어도 실제 파일은 Render container 안에만 있을 수 있으므로 DB dump만으로는 복구되지 않는다.
-
-1. DB에서 파일 record 수와 `storageKey` 목록을 읽기 전용으로 확인한다.
-2. 파일이 하나라도 있으면 업로드·삭제 요청을 잠시 막아 쓰기를 동결한다.
-3. Render에서 각 파일을 내려받고 같은 논리 키로 `gs://${GCS_BUCKET}/cityfarmerplus/prod/<storageKey>`에 올린다.
-4. 객체 수, 크기, SHA-256을 원본과 대조한다.
-5. GCP에서 기존 파일과 새 파일의 다운로드를 모두 확인한다.
-6. 프론트 API URL을 GCP로 바꾼 뒤에만 Render를 정리한다.
-
-Render와 GCP를 동시에 쓰기 가능 상태로 오래 두면 Render 신규 파일은 로컬에, GCP 신규 파일은 GCS에 저장되는 split-brain이 생긴다. 파일이 0개라면 그 사실을 확인한 기록을 남기고 이전 단계를 생략할 수 있다.
-
-Render container에서 원본을 내보낼 방법이 없거나 이미 사라진 파일이 있으면, 손실을 명시적으로 수용하기 전에는 Render service를 삭제하지 않는다.
-
-## 11. 컷오버 Smoke Test
-
-Render를 삭제하기 전에 다음을 모두 통과해야 한다.
+운영 배포를 완료한 뒤 다음을 모두 통과해야 한다.
 
 1. `GET /health`가 `200`을 반환한다.
 2. 회원가입·로그인·JWT 인증 요청이 성공한다.
@@ -423,30 +410,22 @@ Render를 삭제하기 전에 다음을 모두 통과해야 한다.
 
 JWT secret 또는 issuer를 바꾸면 기존 토큰은 무효가 되므로 사용자는 다시 로그인해야 한다.
 
-## 12. Render 제거 순서
-
-GCP Smoke Test를 통과한 뒤에만 다음 순서로 정리한다.
-
-1. Render Blueprint `cityfarmerplus`를 disconnect한다.
-2. Render Web Service `cityfarmerplus-api`를 삭제한다.
-3. `https://cityfarmerplus-api.onrender.com`이 더 이상 서비스되지 않는지 확인한다.
-4. Render에만 있던 secret은 더 이상 필요하지 않을 때 폐기한다.
-
-저장소의 `render.yaml`을 삭제하는 것만으로 기존 Render 서비스가 삭제되지는 않는다. Dashboard에서 별도 삭제가 필요하다.
-
-## 13. 운영 주의사항
+## 11. 운영 주의사항
 
 - Cloud Run request-based CPU와 `min=0`에서는 요청이 없을 때 `@Scheduled` 작업 실행이 보장되지 않는다. 현재 파일 삭제 재시도 worker는 best-effort다.
 - 무료 운영에서는 keep-alive용 주기 ping을 두지 않는다. 인위적인 요청은 scale-to-zero를 방해하고 무료 사용량을 소비한다.
 - Cloud Run HTTP/1 요청 한도에 맞춰 multipart 전체 요청 크기는 31MB로 제한한다.
 - 외부 MySQL의 IP allowlist가 고정 IP만 허용하면 Cloud Run에서 연결되지 않을 수 있다.
+- 현재 Aiven 무료 MySQL은 장기간 활동이 없으면 자동으로 꺼질 수 있다. 이 경우 GCP 리소스가 정상이어도 애플리케이션 기동 시 DB DNS/연결 오류로 `5xx`가 발생한다.
+- 장애 확인 순서는 Aiven 서비스 `Running` 확인 → 공개 DNS/포트 확인 → `GET /api/education/courses`처럼 DB를 읽는 API 확인이다. `/health`만으로는 DB 연결을 증명할 수 없다.
+- `DB_POOL_INITIALIZATION_FAIL_TIMEOUT=60000`은 DB를 켠 직후의 짧은 DNS·연결 지연을 흡수하지만, 꺼진 Aiven 서비스를 대신 켜 주지는 않는다.
 - 운영 외부 MySQL은 백업과 스키마 비교 후 처음부터 `JPA_DDL_AUTO=validate`로 연결한다. 변경이 필요하면 복제 DB에서 검증한 migration을 명시적으로 적용한다.
 - 전용 Artifact Registry cleanup policy는 최신 version 하나만 보존하고 나머지를 비동기로 삭제한다.
 - build source bucket은 lifecycle rule로 업로드 파일을 1일 후 삭제한다.
 - 비용 알림을 설정해도 리소스는 자동 중지되지 않는다.
 - Cloud Storage soft delete를 껐으므로 앱에서 삭제한 파일은 복구할 수 없다.
 
-## 14. 공식 문서
+## 12. 공식 문서
 
 - [Cloud Run container contract](https://docs.cloud.google.com/run/docs/container-contract)
 - [Cloud Run pricing](https://cloud.google.com/run/pricing)
@@ -460,3 +439,5 @@ GCP Smoke Test를 통과한 뒤에만 다음 순서로 정리한다.
 - [Artifact Registry cleanup policy](https://docs.cloud.google.com/artifact-registry/docs/repositories/cleanup-policy)
 - [Artifact Registry pricing](https://cloud.google.com/artifact-registry/pricing)
 - [Secret Manager pricing](https://cloud.google.com/secret-manager/pricing)
+- [Aiven for MySQL free tier](https://aiven.io/docs/products/mysql/concepts/mysql-free-tier)
+- [Aiven MySQL power cycle](https://aiven.io/docs/products/mysql/howto/power-cycle-service)

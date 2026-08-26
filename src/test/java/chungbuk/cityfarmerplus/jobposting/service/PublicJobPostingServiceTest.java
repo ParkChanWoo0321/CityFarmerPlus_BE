@@ -17,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.Instant;
@@ -122,6 +123,45 @@ class PublicJobPostingServiceTest {
 
         verify(applicationRepository, never())
                 .findAllByJobPostingIdInAndUrbanFarmerId(any(), any());
+    }
+
+    @Test
+    void openStatusUsesStableChronologicalOrdering() {
+        ArgumentCaptor<Pageable> pageableCaptor =
+                ArgumentCaptor.forClass(Pageable.class);
+        when(postingRepository.findAll(
+                any(Specification.class),
+                any(Pageable.class)
+        )).thenAnswer(invocation -> new PageImpl<>(
+                List.of(),
+                invocation.getArgument(1),
+                0
+        ));
+
+        service.getPostings(
+                20L,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                PublicRecruitmentStatus.OPEN,
+                0,
+                20
+        );
+
+        verify(postingRepository).findAll(
+                any(Specification.class),
+                pageableCaptor.capture()
+        );
+        assertThat(pageableCaptor.getValue().getSort().toList())
+                .containsExactly(
+                        Sort.Order.asc("workDate"),
+                        Sort.Order.asc("startTime"),
+                        Sort.Order.desc("approvedAt"),
+                        Sort.Order.asc("id")
+                );
     }
 
     @Test

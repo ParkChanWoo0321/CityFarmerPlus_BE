@@ -7,6 +7,8 @@ import chungbuk.cityfarmerplus.farm.ownership.controller.FarmOwnershipSubmission
 import chungbuk.cityfarmerplus.farm.ownership.controller.FarmOwnershipDocumentController;
 import chungbuk.cityfarmerplus.farm.ownership.exception.FarmOwnershipException;
 import chungbuk.cityfarmerplus.jobposting.controller.FarmJobPostingController;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
         FarmOwnershipSubmissionController.class,
         FarmOwnershipDocumentController.class
 })
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public class FarmProfileExceptionHandler {
 
     @ExceptionHandler(FarmProfileException.class)

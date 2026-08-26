@@ -1,6 +1,6 @@
 # CityFarmerPlus backend-1 API 명세
 
-- 기준일: 2026-08-20
+- 기준일: 2026-08-26
 - 실제 HTTP 작업 수: 66개
 - 기준 코드: 현재 Controller·DTO·Security·Service
 - 상세 필드·오류·상태 규칙: [FULL_API_SPEC.md](FULL_API_SPEC.md)
@@ -23,7 +23,7 @@ http://localhost:8080
 Authorization: Bearer {{accessToken}}
 ```
 
-인증 없이 호출 가능한 API는 회원가입, 아이디 확인, 로그인, 활성 교육 과정 조회 4개다. 그 외 API는 JWT가 필요하며, 공고 조회와 FAQ도 현재 설정상 인증 대상이다.
+인증 없이 호출 가능한 API는 회원가입, 아이디 확인, 로그인, 활성 교육 과정 조회, 공개 공고 목록·상세, FAQ다. 그 외 API는 JWT가 필요하다. 공고 조회에 유효한 JWT를 선택적으로 보내면 현재 사용자의 지원 정보가 포함된다.
 
 JSON 오류 형식:
 
@@ -75,9 +75,9 @@ JSON 오류 형식:
 
 | 기능 | Method | URL | 권한 | 성공 |
 |---|---|---|---|---|
-| 회원가입 | `POST` | `/api/auth/signup` | 공개 | `201` |
+| 회원가입 | `POST` | `/api/auth/signup` | 공개 | `201 TokenResponse` |
 | 아이디 중복 확인 | `GET` | `/api/auth/check-id?loginId=` | 공개 | `200` |
-| 로그인 | `POST` | `/api/auth/login` | 공개 | `200` |
+| 로그인 | `POST` | `/api/auth/login` | 공개 | `200 TokenResponse` |
 | 내 정보 조회 | `GET` | `/api/auth/me` | 활성 계정 | `200` |
 | 내 정보 수정 | `PATCH` | `/api/auth/me` | 활성 계정 | `200` |
 | 회원 탈퇴 | `POST` | `/api/auth/withdrawal` | 활성 계정 | `204` |
@@ -93,7 +93,27 @@ JSON 오류 형식:
 - `birthDate`: 선택, 미래일 불가
 - `address`: 선택, 최대 255자
 
-JWT는 HS256이며 기본 만료는 1시간이다. 로그아웃은 클라이언트 JWT 삭제 방식이다.
+회원가입과 로그인은 같은 토큰 본문을 반환한다. 회원가입 성공 응답 예시:
+
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+  "tokenType": "Bearer",
+  "expiresInSeconds": 3600,
+  "user": {
+    "id": 15,
+    "loginId": "urban_user",
+    "name": "김도시",
+    "phoneNumber": "01012345678",
+    "birthDate": "1990-05-20",
+    "address": "충청북도 청주시 상당구",
+    "userType": "URBAN_FARMER",
+    "accountStatus": "ACTIVE"
+  }
+}
+```
+
+회원가입 성공 직후 `accessToken`을 별도 로그인 없이 사용할 수 있다. JWT는 HS256이며 기본 만료는 1시간이고, 실제 `expiresInSeconds`는 서버 설정을 따른다. 로그아웃은 클라이언트 JWT 삭제 방식이다.
 
 ---
 
@@ -186,10 +206,10 @@ JWT는 HS256이며 기본 만료는 1시간이다. 로그아웃은 클라이언�
 | 심사 철회 | `POST` | `/api/farm/job-postings/{postingId}/withdraw-review` | `FARM` 소유자 | `200` |
 | 희망 지원자 조건 수정 | `PATCH` | `/api/farm/job-postings/{postingId}/applicant-preference` | `FARM` 소유자 | `200` |
 | 공고 취소 | `POST` | `/api/farm/job-postings/{postingId}/cancel` | `FARM` 소유자 | `200` |
-| 모집 중·마감 공고 목록 | `GET` | `/api/job-postings?recruitmentStatus={OPEN|CLOSED|ALL}` | 활성 계정 | `200` |
-| 공개 공고 상세 | `GET` | `/api/job-postings/{postingId}?includeClosed={boolean}` | 활성 계정 | `200` |
+| 모집 중·마감 공고 목록 | `GET` | `/api/job-postings?recruitmentStatus={OPEN|CLOSED|ALL}` | 공개, JWT 선택 | `200` |
+| 공개 공고 상세 | `GET` | `/api/job-postings/{postingId}?includeClosed={boolean}` | 공개, JWT 선택 | `200` |
 
-AI는 현재 외부 LLM이 아닌 규칙 기반 미리보기다. 공개 목록은 keyword, region, crop, 날짜 범위, workType, recruitmentStatus를 지원한다. 공개 응답에는 화면 상태 `recruitmentStatus`, 실제 접수 가능 여부 `acceptingApplications`, 현재 사용자의 지원 요약 `myApplication`이 포함된다. `includeClosed=true` 상세는 이전에 승인·공개된 마감 공고만 허용한다.
+AI는 현재 외부 LLM이 아닌 규칙 기반 미리보기다. 공개 목록은 keyword, region, crop, 날짜 범위, workType, recruitmentStatus를 지원한다. 공개 응답에는 화면 상태 `recruitmentStatus`, 실제 접수 가능 여부 `acceptingApplications`, 현재 사용자의 지원 요약 `myApplication`이 포함된다. 익명 요청에서는 `myApplication`이 `null`이고, 유효한 JWT를 보내면 해당 사용자의 지원 정보로 개인화된다. `includeClosed=true` 상세는 이전에 승인·공개된 마감 공고만 허용한다.
 
 공고 상태는 `DRAFT`, `PENDING_REVIEW`, `OPEN`, `CLOSED`, `CANCELLED`, `WORK_COMPLETED`이며 backend-1에는 공고 승인·반려·강제 마감 API가 없다.
 
@@ -218,12 +238,12 @@ AI는 현재 외부 LLM이 아닌 규칙 기반 미리보기다. 공개 목록�
 | 도시농부 근무 상세 | `GET` | `/api/urban-farmers/me/work-assignments/{assignmentId}` | `URBAN_FARMER` | `200` |
 | 작업 안내 | `GET` | `/api/urban-farmers/me/work-assignments/{assignmentId}/guide` | `URBAN_FARMER` | `200` |
 | 농가 배정 목록 | `GET` | `/api/farm/work-assignments` | 승인된 `FARM` | `200` |
-| 출결 최초 등록 | `PUT` | `/api/farm/work-assignments/{assignmentId}/attendance` | 승인된 `FARM` 소유자 | `200` |
+| 출결 등록·동일 값 재시도 | `PUT` | `/api/farm/work-assignments/{assignmentId}/attendance` | 승인된 `FARM` 소유자 | `200` |
 | 근무 완료 | `POST` | `/api/farm/work-assignments/{assignmentId}/complete` | 승인된 `FARM` 소유자 | `200` |
 
 도시농부 근무 목록은 `view=ALL|UPCOMING|PAST`를 받으며 기본값은 `ALL`이다. `UPCOMING`은 서울 시간 기준 종료 전인 `SCHEDULED` 근무를 가까운 순으로, `PAST`는 완료·결근·취소 또는 종료 지난 예정 근무를 최신 순으로 반환한다. 종료 시각과 현재 시각이 같으면 `PAST`다.
 
-출결은 작업 시작 후 `PRESENT` 또는 `ABSENT`로 최초 한 번 등록한다. 근무 완료는 종료 시각 이후 `PRESENT` 상태에서 농가가 확정한다. 출결 정정 상태와 이력 엔티티는 공통 계약이지만 backend-1에는 정정 API가 없다.
+출결은 작업 시작 후 `PRESENT` 또는 `ABSENT`로 최초 등록한다. 같은 농가 소유자가 이미 등록된 것과 같은 값을 다시 `PUT`하면 상태를 변경하지 않고 `200`과 현재 배정을 반환한다. 다른 값으로의 변경은 `409`다. 근무 완료는 종료 시각 이후 `PRESENT` 상태에서 농가가 확정한다. 출결 정정 상태와 이력 엔티티는 공통 계약이지만 backend-1에는 정정 API가 없다.
 
 ---
 
@@ -242,7 +262,7 @@ AI는 현재 외부 LLM이 아닌 규칙 기반 미리보기다. 공개 목록�
 
 | 기능 | Method | URL | 권한 | 성공 |
 |---|---|---|---|---|
-| FAQ | `GET` | `/api/support/faqs` | 활성 계정 | `200` |
+| FAQ | `GET` | `/api/support/faqs` | 공개 | `200` |
 | 상담 메시지 | `POST` | `/api/ai/support/messages` | 활성 계정 | `200` |
 | 내 상담 이력 | `GET` | `/api/ai/support/messages` | 활성 계정 | `200` |
 
@@ -257,7 +277,7 @@ AI 상담도 현재 규칙 기반이며 확정되지 않은 행정 답변에는 
 - 허용: PDF, JPG, JPEG, PNG
 - 개별 파일: 최대 10 MiB
 - 요청당: 1~5개, 총 30 MiB
-- 서버 multipart 한도: 파일당 12MB, 요청당 35MB
+- 서버 multipart 한도: 파일당 12MB, 요청당 31MB
 - 확장자·MIME·파일 시그니처 교차 검증
 - 반려 후 재제출 시 과거 회차와 파일 메타데이터 보존
 - 회원 탈퇴 시 실제 파일 삭제 작업 등록 및 실패 재시도
