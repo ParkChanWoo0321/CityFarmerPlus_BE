@@ -102,6 +102,8 @@ public interface WorkAssignmentRepository extends JpaRepository<WorkAssignment, 
 
     Page<WorkAssignment> findByFarmProfileId(Long farmProfileId, Pageable pageable);
 
+    Page<WorkAssignment> findByStatus(WorkAssignment.WorkStatus status, Pageable pageable);
+
     List<WorkAssignment> findByJobPostingIdOrderByCreatedAtAsc(Long jobPostingId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

@@ -9,12 +9,15 @@ import chungbuk.cityfarmerplus.common.exception.DomainException;
 import chungbuk.cityfarmerplus.jobposting.entity.JobPosting;
 import chungbuk.cityfarmerplus.jobposting.exception.JobPostingException;
 import chungbuk.cityfarmerplus.jobposting.repository.JobPostingRepository;
+import chungbuk.cityfarmerplus.work.dto.WorkAssignmentResponse;
 import chungbuk.cityfarmerplus.work.entity.WorkAssignment;
 import chungbuk.cityfarmerplus.work.entity.WorkAssignmentCorrection;
 import chungbuk.cityfarmerplus.work.exception.WorkAssignmentException;
 import chungbuk.cityfarmerplus.work.repository.WorkAssignmentCorrectionRepository;
 import chungbuk.cityfarmerplus.work.repository.WorkAssignmentRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -96,6 +99,27 @@ public class AdminWorkAssignmentService {
                 .stream()
                 .map(WorkAssignmentCorrectionResponse::from)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<WorkAssignmentResponse> list(
+            Long adminId,
+            WorkAssignment.WorkStatus status,
+            Pageable pageable
+    ) {
+        requireCenterAdmin(adminId);
+        Page<WorkAssignment> assignments = status == null
+                ? workAssignmentRepository.findAll(pageable)
+                : workAssignmentRepository.findByStatus(status, pageable);
+        return assignments.map(WorkAssignmentResponse::from);
+    }
+
+    @Transactional(readOnly = true)
+    public WorkAssignmentResponse getDetail(Long adminId, Long assignmentId) {
+        requireCenterAdmin(adminId);
+        WorkAssignment assignment = workAssignmentRepository.findById(assignmentId)
+                .orElseThrow(WorkAssignmentException::notFound);
+        return WorkAssignmentResponse.from(assignment);
     }
 
     private User requireCenterAdmin(Long adminId) {

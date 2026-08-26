@@ -15,6 +15,8 @@ public interface ParticipationApplicationRepository
 
     boolean existsByUrbanFarmerIdAndProgramYear(Long userId, int programYear);
 
+    long countByStatus(ParticipationApplication.ParticipationStatus status);
+
     Optional<ParticipationApplication> findByIdAndUrbanFarmerId(
             Long id,
             Long userId

@@ -1,9 +1,9 @@
-# CityFarmerPlus 관리자 근무 출결 정정 API 명세서
+# CityFarmerPlus 관리자 근무 배정 조회 및 출결 정정 API 명세서
 
-- 문서 버전: 1.0
+- 문서 버전: 1.1
 - 작성일: 2026-08-26
 - 구현 기준 브랜치: `backend-2`
-- 적용 범위: 담당자의 출결 정정, 정정 이력 조회 (최초 출결 등록·근무 완료 확정은 농가 전용이며 이 문서 범위 밖)
+- 적용 범위: 근무 배정 목록·상세 조회, 출결 정정, 정정 이력 조회 (최초 출결 등록·근무 완료 확정은 농가 전용이며 이 문서 범위 밖)
 
 ## 1. 공통 사항
 
@@ -46,6 +46,8 @@ Authorization: Bearer {{adminAccessToken}}
 
 | 기능 | Method | URL | 인증 | 성공 상태 |
 |---|---|---|---|---|
+| 근무 배정 목록 조회 | `GET` | `/api/admin/work-assignments` | Bearer JWT (`ROLE_CENTER_ADMIN`) | `200 OK` |
+| 근무 배정 상세 조회 | `GET` | `/api/admin/work-assignments/{assignmentId}` | Bearer JWT (`ROLE_CENTER_ADMIN`) | `200 OK` |
 | 출결 정정 | `POST` | `/api/admin/work-assignments/{assignmentId}/attendance-correction` | Bearer JWT (`ROLE_CENTER_ADMIN`) | `200 OK` |
 | 정정 이력 조회 | `GET` | `/api/admin/work-assignments/{assignmentId}/correction-history` | Bearer JWT (`ROLE_CENTER_ADMIN`) | `200 OK` |
 
@@ -234,5 +236,124 @@ HTTP/1.1 200 OK
 
 - 정정 취소/되돌리기(정정 이력은 append-only라 삭제·수정 API가 없음 — 잘못 정정했다면 반대 방향으로 다시 정정해야 함)
 - 여러 근무 일정 일괄 정정
-- 정정 대상 후보 목록 조회(예: "최근 결근 처리된 건" 같은 큐) — `WorkAssignment`는 `PENDING_REVIEW` 같은 대기 상태 개념이 없어 이번 범위에 포함하지 않음
+- "정정 대상 후보" 전용 큐는 없지만, 9장의 목록 조회에 `status=NO_SHOW` 필터를 걸면 결근 처리된 건 전체를 유사하게 확인할 수 있다(전용 대기 상태 개념은 여전히 없음)
 - 근무 일정 자체의 취소(관리자용), 근태 관련 통계·대시보드
+- 목록 조회의 상태 필터 외 추가 필터(농가·도시농부·근무일·공고별 등), 검색어, 정렬 옵션 지정
+
+## 9. 근무 배정 목록 조회
+
+전체 근무 배정을 페이지네이션으로 조회한다. 필터는 상태값(`status`) 하나뿐이며, 생략하면 전체 상태를 반환한다.
+
+### 9.1 요청
+
+```http
+GET /api/admin/work-assignments?status=NO_SHOW&page=0&size=20
+Authorization: Bearer {{adminAccessToken}}
+```
+
+| 쿼리 파라미터 | 타입 | 필수 | 기본값 | 설명 |
+|---|---|---|---|---|
+| `status` | Enum | X | 없음(전체) | `SCHEDULED`, `COMPLETED`, `NO_SHOW`, `CANCELLED` 중 하나 |
+| `page` | int | X | `0` | Spring Data 기본 페이지네이션(0부터 시작) |
+| `size` | int | X | `20` | Spring Data 기본값 |
+| `sort` | String | X | 없음 | 예: `sort=workDate,desc` |
+
+### 9.2 성공 응답
+
+```http
+HTTP/1.1 200 OK
+```
+
+컨트롤러가 `Page<WorkAssignmentResponse>`를 그대로 반환하므로, 응답 본문은 `content` 배열과 페이지 메타데이터를 함께 담은 형식이다(다른 관리자 목록 API와 동일한 `Page` 직렬화 형식 — `ADMIN_JOB_POSTING_API_SPEC.md` 3.2절 참고).
+
+```json
+{
+  "content": [
+    {
+      "id": 55,
+      "jobPostingId": 12,
+      "jobApplicationId": 101,
+      "urbanFarmerUserId": 10,
+      "urbanFarmerName": "홍길동",
+      "confirmedByUserId": 3,
+      "confirmedByName": "충북 담당자",
+      "confirmedByContactNumber": "01011112222",
+      "farmName": "충주 사과농원",
+      "farmAddress": "충청북도 충주시 예시로 1",
+      "farmContactNumber": "01012345678",
+      "crop": "사과",
+      "workType": "수확",
+      "workDate": "2026-09-01",
+      "startTime": "09:00:00",
+      "endTime": "17:00:00",
+      "recruitmentCapacity": 5,
+      "meetingPlace": "충주시 사과농원 정문",
+      "wageAmount": 100000,
+      "wageUnit": "DAILY",
+      "supplies": "장갑, 모자",
+      "precautions": "미끄럼 주의",
+      "status": "NO_SHOW",
+      "attendanceStatus": "ABSENT",
+      "completedAt": null
+    }
+  ],
+  "pageable": {
+    "pageNumber": 0,
+    "pageSize": 20,
+    "offset": 0,
+    "paged": true,
+    "unpaged": false,
+    "sort": { "sorted": false, "unsorted": true, "empty": true }
+  },
+  "totalElements": 1,
+  "totalPages": 1,
+  "size": 20,
+  "number": 0,
+  "sort": { "sorted": false, "unsorted": true, "empty": true },
+  "first": true,
+  "last": true,
+  "numberOfElements": 1,
+  "empty": false
+}
+```
+
+`content`의 각 항목은 [`WorkAssignmentResponse`](../src/main/java/chungbuk/cityfarmerplus/work/dto/WorkAssignmentResponse.java)로, 4.2절 정정 응답과 달리 근무 배정 자체의 전체 필드(공고·도시농부·농가·임금·현재 상태)를 담는다. 정렬 기본값은 `JpaRepository.findAll(Pageable)`/`findByStatus(status, Pageable)`가 그대로 적용하는 Spring Data 기본 정렬(지정 없으면 무정렬)이다.
+
+### 9.3 오류 응답
+
+| 상태 | 코드 | 발생 조건 |
+|---|---|---|
+| `400` | `INVALID_REQUEST_PARAMETER` | `status` 값이 `WorkStatus` enum에 없는 문자열 |
+| `401` | `UNAUTHORIZED` | JWT 누락, 만료 또는 위조 |
+| `403` | `ACCESS_DENIED` | `CENTER_ADMIN`이 아닌 계정의 JWT로 접근(URL 패턴 단계) |
+| `403` | `CENTER_ADMIN_ROLE_REQUIRED` | JWT는 유효하지만 DB상 해당 계정이 `CENTER_ADMIN`이 아니거나 삭제됨 |
+| `403` | `INACTIVE_ACCOUNT` | 관리자 계정이 정지·탈퇴 상태 |
+| `404` | `USER_NOT_FOUND` | JWT의 관리자 ID에 해당하는 회원이 없음 |
+
+## 10. 근무 배정 상세 조회
+
+### 10.1 요청
+
+```http
+GET /api/admin/work-assignments/55
+Authorization: Bearer {{adminAccessToken}}
+```
+
+### 10.2 성공 응답
+
+```http
+HTTP/1.1 200 OK
+```
+
+9.2절 `content` 배열 안 항목과 동일한 `WorkAssignmentResponse` 형식이다(단일 객체). 상태와 무관하게 조회할 수 있다(`SCHEDULED`, `COMPLETED`, `NO_SHOW`, `CANCELLED` 전부 조회 가능).
+
+### 10.3 오류 응답
+
+| 상태 | 코드 | 발생 조건 |
+|---|---|---|
+| `401` | `UNAUTHORIZED` | JWT 누락, 만료 또는 위조 |
+| `403` | `ACCESS_DENIED` | `CENTER_ADMIN`이 아닌 계정의 JWT로 접근(URL 패턴 단계) |
+| `403` | `CENTER_ADMIN_ROLE_REQUIRED` | JWT는 유효하지만 DB상 해당 계정이 `CENTER_ADMIN`이 아니거나 삭제됨 |
+| `403` | `INACTIVE_ACCOUNT` | 관리자 계정이 정지·탈퇴 상태 |
+| `404` | `USER_NOT_FOUND` | JWT의 관리자 ID에 해당하는 회원이 없음 |
+| `404` | `WORK_ASSIGNMENT_NOT_FOUND` | 해당 `assignmentId`의 근무 일정이 없음 |
