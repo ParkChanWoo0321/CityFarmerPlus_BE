@@ -95,7 +95,7 @@ gcloud run deploy "${SERVICE}" \
   --service-account="${RUNTIME_SA}" \
   --port=8080 \
   --cpu=1 \
-  --memory=1Gi \
+  --memory=2Gi \
   --concurrency=1 \
   --min=0 \
   --max=1 \

@@ -309,7 +309,7 @@ gcloud run deploy "$SERVICE" \
   --service-account="$RUNTIME_SA" \
   --port=8080 \
   --cpu=1 \
-  --memory=1Gi \
+  --memory=2Gi \
   --concurrency=1 \
   --min=0 \
   --max=1 \
@@ -415,7 +415,7 @@ JWT secret 또는 issuer를 바꾸면 기존 토큰은 무효가 되므로 사�
 - Cloud Run request-based CPU와 `min=0`에서는 요청이 없을 때 `@Scheduled` 작업 실행이 보장되지 않는다. 현재 파일 삭제 재시도 worker는 best-effort다.
 - 무료 운영에서는 keep-alive용 주기 ping을 두지 않는다. 인위적인 요청은 scale-to-zero를 방해하고 무료 사용량을 소비한다.
 - Cloud Run HTTP/1 요청 한도에 맞춰 multipart 전체 요청 크기는 31MB로 제한한다.
-- 현재 Spring Boot 런타임은 512MiB에서 메모리 한도를 초과했으므로 운영 기준을 1GiB로 유지한다.
+- 현재 Spring Boot 런타임은 512MiB에서 메모리 한도를 초과했으므로 운영 기준을 2GiB로 유지한다. 이 설정은 1 vCPU의 요청 기반 무료 CPU·RAM 할당량을 약 50시간의 활성 시간까지 균형 있게 사용한다.
 - 외부 MySQL의 IP allowlist가 고정 IP만 허용하면 Cloud Run에서 연결되지 않을 수 있다.
 - 현재 Aiven 무료 MySQL은 장기간 활동이 없으면 자동으로 꺼질 수 있다. 이 경우 GCP 리소스가 정상이어도 애플리케이션 기동 시 DB DNS/연결 오류로 `5xx`가 발생한다.
 - 장애 확인 순서는 Aiven 서비스 `Running` 확인 → 공개 DNS/포트 확인 → `GET /api/education/courses`처럼 DB를 읽는 API 확인이다. `/health`만으로는 DB 연결을 증명할 수 없다.
