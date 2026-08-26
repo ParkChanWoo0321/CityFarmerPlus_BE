@@ -1,7 +1,7 @@
 # CityFarmerPlus 회원·인증 API 명세서
 
 - 문서 버전: 2.0
-- 갱신일: 2026-08-20
+- 갱신일: 2026-08-26
 - 구현 기준 브랜치: `backend-1`
 - 적용 범위: 회원가입, 아이디 확인, 로그인, 내 정보 조회·수정, 회원 탈퇴, 로그아웃
 - 관련 문서: [FULL_API_SPEC.md](FULL_API_SPEC.md), [API_SPEC_INDEX.md](API_SPEC_INDEX.md)
@@ -92,18 +92,28 @@ Content-Type: application/json
 
 성공 응답:
 
+- HTTP: `201 Created`
+- Body: 로그인과 동일한 `TokenResponse`
+
 ```json
 {
-  "id": 1,
-  "loginId": "farm_user",
-  "name": "농가 사용자",
-  "phoneNumber": "01012345678",
-  "birthDate": "1985-03-12",
-  "address": "충청북도 충주시",
-  "userType": "FARM",
-  "accountStatus": "ACTIVE"
+  "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+  "tokenType": "Bearer",
+  "expiresInSeconds": 3600,
+  "user": {
+    "id": 1,
+    "loginId": "farm_user",
+    "name": "농가 사용자",
+    "phoneNumber": "01012345678",
+    "birthDate": "1985-03-12",
+    "address": "충청북도 충주시",
+    "userType": "FARM",
+    "accountStatus": "ACTIVE"
+  }
 }
 ```
+
+회원가입이 성공하면 별도 로그인 요청 없이 이 `accessToken`을 보호 API에 바로 사용할 수 있다. 실제 `expiresInSeconds`는 서버 환경 설정을 따른다.
 
 대표 오류:
 
@@ -146,6 +156,9 @@ Content-Type: application/json
 
 성공 응답:
 
+- HTTP: `200 OK`
+- Body: 회원가입과 동일한 `TokenResponse`
+
 ```json
 {
   "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
@@ -173,7 +186,7 @@ GET /api/auth/me
 Authorization: Bearer {{accessToken}}
 ```
 
-응답은 회원가입의 `UserResponse` 형식과 같다.
+응답은 `TokenResponse.user`와 같은 `UserResponse` 형식이며, 토큰 필드는 포함하지 않는다.
 
 ## 8. 내 정보 수정
 

@@ -13,7 +13,7 @@ BUILD_SA_RESOURCE="projects/${PROJECT_ID}/serviceAccounts/${BUILD_SA}"
 GCS_BUCKET="${PROJECT_ID}-cityfarmerplus-private"
 BUILD_SOURCE_BUCKET="${PROJECT_ID}-cityfarmerplus-build-source"
 JWT_ISSUER="${JWT_ISSUER:-https://api.cityfarmerplus.local}"
-CORS_ALLOWED_ORIGINS="${CORS_ALLOWED_ORIGINS:-https://cityfarmerplus-mobile.op9563.chatgpt.site}"
+CORS_ALLOWED_ORIGINS="${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 
@@ -64,6 +64,8 @@ trap 'rm -f "${ENV_FILE}"' EXIT
 cat >"${ENV_FILE}" <<EOF
 DB_POOL_MAX_SIZE: "5"
 DB_POOL_MIN_IDLE: "0"
+DB_CONNECTION_TIMEOUT: "10000"
+DB_POOL_INITIALIZATION_FAIL_TIMEOUT: "60000"
 JPA_DDL_AUTO: "validate"
 JPA_SHOW_SQL: "false"
 JWT_ISSUER: "${JWT_ISSUER}"

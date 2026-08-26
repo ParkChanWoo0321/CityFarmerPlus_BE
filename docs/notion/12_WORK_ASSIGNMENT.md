@@ -26,7 +26,7 @@
 | `GET` | `/api/urban-farmers/me/work-assignments/{assignmentId}` | URBAN_FARMER | 내 근무 상세 | 200 |
 | `GET` | `/api/urban-farmers/me/work-assignments/{assignmentId}/guide` | URBAN_FARMER | 작업 준비·안전 안내 | 200 |
 | `GET` | `/api/farm/work-assignments` | FARM | 농가 근무 목록 | 200 |
-| `PUT` | `/api/farm/work-assignments/{assignmentId}/attendance` | FARM | 출근/결근 등록 | 200 |
+| `PUT` | `/api/farm/work-assignments/{assignmentId}/attendance` | FARM | 출근/결근 등록·동일 값 재시도 | 200 |
 | `POST` | `/api/farm/work-assignments/{assignmentId}/complete` | FARM | 농가 근무 완료 확정 | 200 |
 
 ## 상태 값
@@ -254,9 +254,12 @@
 ### 요청
 
 - 작업 시작 시각 이후에만 등록 가능
-- `SCHEDULED` + `NOT_RECORDED`인 일정에 최초 1회만 가능
+- 최초 상태 변경은 `SCHEDULED` + `NOT_RECORDED`인 일정에서만 가능
 - `status`: `PRESENT` 또는 `ABSENT`
 - `NOT_RECORDED`를 요청값으로 보낼 수 없음
+- 같은 농가 소유자가 기존 `attendanceStatus`와 같은 값을 재시도하면 `200` + 현재 `WorkAssignmentResponse`
+- 동일 값 재시도는 멱등적이며 출결·근무·지원 상태, 최초 기록 시각, 기록자를 변경하지 않음
+- 이미 등록된 값과 다른 `PRESENT`/`ABSENT`로 바꾸려는 요청은 `INVALID_WORK_ASSIGNMENT_STATE`(409)
 
 ```json
 {
@@ -298,7 +301,9 @@
 
 `ABSENT`를 등록하면 근무 `status` = `NO_SHOW`, 지원 `status` = `NO_SHOW`로 함께 변경된다.
 
-오류: `VALIDATION_ERROR`/`INVALID_REQUEST`(400), `INVALID_WORK_ASSIGNMENT_STATE`(409), `INVALID_JOB_APPLICATION_STATE`(409, `NOT_RECORDED` 요청 등), `WORK_ASSIGNMENT_NOT_FOUND`(404), `WORK_ASSIGNMENT_NOT_OWNER`(403), `CONCURRENT_UPDATE_CONFLICT`(409).
+프론트엔드는 네트워크 타임아웃으로 첫 응답을 받지 못했더라도 같은 `status`로 안전하게 재시도할 수 있다. 기존 값과 다른 정정은 backend-1 API로 하지 않는다.
+
+오류: `VALIDATION_ERROR`/`INVALID_REQUEST`(400), `INVALID_WORK_ASSIGNMENT_STATE`(409, `NOT_RECORDED` 요청·기존과 다른 출결 변경 요청 등), `WORK_ASSIGNMENT_NOT_FOUND`(404), `WORK_ASSIGNMENT_NOT_OWNER`(403), `CONCURRENT_UPDATE_CONFLICT`(409).
 
 ## 6. 농가 근무 완료 확정
 
@@ -376,6 +381,6 @@ curl -X POST "http://localhost:8080/api/farm/work-assignments/701/complete" \
 ## 현재 제한과 `backend-2` 책임
 
 - 매칭 확정과 `WorkAssignment` 생성은 `backend-2`가 담당해야 한다. `backend-1` 사용자 API는 이미 생성된 일정을 조회/처리한다.
-- 농가는 최초 출근/결근만 등록할 수 있고, 오등록 정정 API는 없다. 정정과 이에 따른 지원/공고 상태 복구는 `backend-2` 담당자 기능이다.
+- 농가는 출근/결근을 최초 등록하고 같은 값만 멱등적으로 재시도할 수 있다. 오등록 정정 API는 없으며, 정정과 이에 따른 지원/공고 상태 복구는 `backend-2` 담당자 기능이다.
 - 도시농부는 자기의 출근 상태를 직접 변경할 수 없다.
 - 작업 안내는 규칙 기반이므로 농가가 작성한 공고와 현장 지침을 우선해야 한다.

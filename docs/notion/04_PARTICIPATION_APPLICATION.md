@@ -392,13 +392,13 @@ Authorization: Bearer {{accessToken}}
   "submittedAt": "2026-08-11T10:50:00.123Z",
   "reviewedAt": null,
   "cancelledAt": null,
-  "version": 2,
+  "version": 3,
   "createdAt": "2026-08-11T10:40:00.123Z",
   "updatedAt": "2026-08-11T11:30:00.456Z"
 }
 ```
 
-위 예시는 반려된 신청을 수정한 경우라 과거 `submittedAt`이 남아 있는 현재 구현을 보여준다. 수정 응답의 `version`, `updatedAt`은 JPA flush 전 값일 수 있으며, 커밋 후 상세 GET으로 다시 조회하면 증가한 버전과 실제 수정 시각을 확인할 수 있다.
+위 예시는 반려된 신청을 수정한 경우라 과거 `submittedAt`이 남아 있는 현재 구현을 보여준다. 변경 내용을 JPA flush한 뒤 응답하므로 `version`과 `updatedAt`에는 이번 수정으로 갱신된 값이 즉시 포함된다.
 
 ### 대표 오류
 
@@ -498,13 +498,13 @@ Authorization: Bearer {{accessToken}}
   "submittedAt": "2026-08-11T10:50:00.123Z",
   "reviewedAt": null,
   "cancelledAt": null,
-  "version": 0,
+  "version": 1,
   "createdAt": "2026-08-11T10:40:00.123Z",
-  "updatedAt": "2026-08-11T10:40:00.123Z"
+  "updatedAt": "2026-08-11T10:50:00.123Z"
 }
 ```
 
-`submittedAt`과 `status`는 즉시 응답에 반영되지만 `version`, `updatedAt`은 JPA flush 전 값일 수 있다. 커밋 후 상세 GET에서는 갱신된 값을 확인할 수 있다.
+변경 내용을 JPA flush한 뒤 응답하므로 `status`, `submittedAt`, 증가한 `version`, 갱신된 `updatedAt`이 모두 즉시 응답에 반영된다.
 
 ### 대표 오류
 
@@ -563,13 +563,13 @@ Authorization: Bearer {{accessToken}}
   "submittedAt": "2026-08-11T10:50:00.123Z",
   "reviewedAt": null,
   "cancelledAt": "2026-08-11T11:10:00.456Z",
-  "version": 1,
+  "version": 2,
   "createdAt": "2026-08-11T10:40:00.123Z",
-  "updatedAt": "2026-08-11T10:50:00.123Z"
+  "updatedAt": "2026-08-11T11:10:00.456Z"
 }
 ```
 
-`cancelledAt`과 `status`는 즉시 응답에 반영되지만 `version`, `updatedAt`은 JPA flush 전 값일 수 있다. 커밋 후 상세 GET에서는 갱신된 값을 확인할 수 있다.
+변경 내용을 JPA flush한 뒤 응답하므로 `status`, `cancelledAt`, 증가한 `version`, 갱신된 `updatedAt`이 모두 즉시 응답에 반영된다.
 
 ### 현재 취소 규칙
 

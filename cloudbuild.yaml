@@ -43,6 +43,7 @@ steps:
           --region="${_REGION}" \
           --platform=managed \
           --image="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_IMAGE}:${_TAG}" \
+          --update-env-vars="^@^CORS_ALLOWED_ORIGINS=${_CORS_ALLOWED_ORIGINS}" \
           --quiet
 
 substitutions:
@@ -52,6 +53,7 @@ substitutions:
   _SERVICE: cityfarmerplus-api
   _TAG: bootstrap
   _DEPLOY: "false"
+  _CORS_ALLOWED_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000"
 
 options:
   logging: CLOUD_LOGGING_ONLY

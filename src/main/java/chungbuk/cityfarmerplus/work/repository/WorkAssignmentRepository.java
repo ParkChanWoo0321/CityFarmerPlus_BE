@@ -145,7 +145,9 @@ public interface WorkAssignmentRepository extends JpaRepository<WorkAssignment, 
                     assignment.workDate > :today
                     or (assignment.workDate = :today and assignment.endTime > :now)
               )
-            order by assignment.workDate asc, assignment.startTime asc
+            order by assignment.workDate asc,
+                     assignment.startTime asc,
+                     assignment.id asc
             """)
     List<WorkAssignment> findUpcomingByUrbanFarmerId(
             @Param("urbanFarmerId") Long urbanFarmerId,

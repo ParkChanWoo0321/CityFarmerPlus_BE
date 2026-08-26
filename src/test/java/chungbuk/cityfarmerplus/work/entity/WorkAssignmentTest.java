@@ -48,6 +48,84 @@ class WorkAssignmentTest {
     }
 
     @Test
+    void retryingSamePresentAttendanceKeepsOriginalRecord() {
+        Fixture fixture = fixture();
+        WorkAssignment assignment = fixture.assignment();
+        Instant firstRecordedAt = Instant.parse("2026-08-20T00:00:00Z");
+
+        assignment.recordAttendance(
+                WorkAssignment.AttendanceStatus.PRESENT,
+                fixture.farmOwner(),
+                firstRecordedAt
+        );
+        assignment.recordAttendance(
+                WorkAssignment.AttendanceStatus.PRESENT,
+                fixture.farmOwner(),
+                Instant.parse("2026-08-20T00:05:00Z")
+        );
+
+        assertThat(assignment.getAttendanceStatus())
+                .isEqualTo(WorkAssignment.AttendanceStatus.PRESENT);
+        assertThat(assignment.getAttendanceRecordedBy()).isSameAs(fixture.farmOwner());
+        assertThat(assignment.getAttendanceRecordedAt()).isEqualTo(firstRecordedAt);
+        assertThat(assignment.getStatus()).isEqualTo(WorkAssignment.WorkStatus.SCHEDULED);
+        assertThat(assignment.getJobApplication().getStatus())
+                .isEqualTo(JobApplication.ApplicationStatus.MATCHED);
+    }
+
+    @Test
+    void retryingSameAbsentAttendanceKeepsOriginalNoShowRecord() {
+        Fixture fixture = fixture();
+        WorkAssignment assignment = fixture.assignment();
+        Instant firstRecordedAt = Instant.parse("2026-08-20T00:00:00Z");
+
+        assignment.recordAttendance(
+                WorkAssignment.AttendanceStatus.ABSENT,
+                fixture.farmOwner(),
+                firstRecordedAt
+        );
+        assignment.recordAttendance(
+                WorkAssignment.AttendanceStatus.ABSENT,
+                fixture.farmOwner(),
+                Instant.parse("2026-08-20T00:05:00Z")
+        );
+
+        assertThat(assignment.getAttendanceStatus())
+                .isEqualTo(WorkAssignment.AttendanceStatus.ABSENT);
+        assertThat(assignment.getAttendanceRecordedBy()).isSameAs(fixture.farmOwner());
+        assertThat(assignment.getAttendanceRecordedAt()).isEqualTo(firstRecordedAt);
+        assertThat(assignment.getStatus()).isEqualTo(WorkAssignment.WorkStatus.NO_SHOW);
+        assertThat(assignment.getJobApplication().getStatus())
+                .isEqualTo(JobApplication.ApplicationStatus.NO_SHOW);
+    }
+
+    @Test
+    void recordingDifferentAttendanceAfterInitialRecordRequiresCorrection() {
+        Fixture fixture = fixture();
+        WorkAssignment assignment = fixture.assignment();
+        Instant firstRecordedAt = Instant.parse("2026-08-20T00:00:00Z");
+        assignment.recordAttendance(
+                WorkAssignment.AttendanceStatus.PRESENT,
+                fixture.farmOwner(),
+                firstRecordedAt
+        );
+
+        assertThatThrownBy(() -> assignment.recordAttendance(
+                WorkAssignment.AttendanceStatus.ABSENT,
+                fixture.farmOwner(),
+                Instant.parse("2026-08-20T00:05:00Z")
+        ))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("담당자만 정정");
+        assertThat(assignment.getAttendanceStatus())
+                .isEqualTo(WorkAssignment.AttendanceStatus.PRESENT);
+        assertThat(assignment.getAttendanceRecordedAt()).isEqualTo(firstRecordedAt);
+        assertThat(assignment.getStatus()).isEqualTo(WorkAssignment.WorkStatus.SCHEDULED);
+        assertThat(assignment.getJobApplication().getStatus())
+                .isEqualTo(JobApplication.ApplicationStatus.MATCHED);
+    }
+
+    @Test
     void presentAttendanceThenCompletionMovesBothStatesToCompleted() {
         Fixture fixture = fixture();
         WorkAssignment assignment = fixture.assignment();

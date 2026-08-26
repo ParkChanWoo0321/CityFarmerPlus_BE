@@ -47,9 +47,14 @@ JWT 자체가 유효하더라도 DB의 현재 계정이 `ACTIVE`가 아니거나
 | `GET` | `/api/auth/check-id` |
 | `POST` | `/api/auth/login` |
 | `GET` | `/api/education/courses` |
+| `GET` | `/api/job-postings` |
+| `GET` | `/api/job-postings/{postingId}` |
+| `GET` | `/api/support/faqs` |
+| `GET` | `/health` |
 | `OPTIONS` | `/api/**` |
+| `OPTIONS` | `/health` |
 
-그 외 API는 현재 Security 설정상 Bearer JWT가 필요하다. 클래스 이름에 `Public`이 포함된 공고 조회 API와 FAQ API도 현재는 JWT가 필요하다.
+그 외 API는 현재 Security 설정상 Bearer JWT가 필요하다. 공개 공고 조회에 JWT는 선택 사항이며, 유효한 JWT를 보내면 현재 사용자의 지원 정보로 응답이 개인화된다. 공개 API에 잘못된 Bearer JWT를 보내면 401을 반환한다.
 
 ---
 
@@ -100,7 +105,7 @@ Postman에서는 `Body > form-data`를 선택하고 `Content-Type`의 boundary�
 | 항목 | 제한 |
 |---|---:|
 | 파일 한 개에 대한 Spring 수신 제한 | 12MB |
-| 요청 전체에 대한 Spring 수신 제한 | 35MB |
+| 요청 전체에 대한 Spring 수신 제한 | 31MB |
 
 도메인별 실제 허용 크기·개수·확장자는 교육 및 농가 소유 증빙 문서에 별도로 적혀 있다.
 
@@ -168,16 +173,21 @@ HTTP/1.1 204 No Content
 | 400 | `VALIDATION_ERROR` | DTO 또는 Query Parameter 검증 실패 |
 | 400 | `INVALID_REQUEST` | JSON 본문 파싱 실패, 잘못된 Enum·날짜 형식 |
 | 400 | `INVALID_REQUEST_PARAMETER` | Path 또는 Query Parameter 타입 변환 실패 |
+| 400 | `MISSING_REQUEST_PARAMETER` | 필수 Query Parameter 누락 |
 | 400 | `MISSING_MULTIPART_PART` | 필수 multipart 파트 누락 |
+| 400 | `INVALID_ARGUMENT` | 처리 중 발견한 잘못된 요청 값 |
 | 401 | `UNAUTHORIZED` | JWT 누락·만료·위조 |
 | 401 | `INVALID_ACCOUNT` | 탈퇴·정지 계정 또는 토큰 역할 불일치 |
 | 403 | `ACCESS_DENIED` | 역할 권한 부족 |
 | 404 | 도메인별 `*_NOT_FOUND` | 대상 데이터가 없음 |
+| 404 | `RESOURCE_NOT_FOUND` | 매핑되지 않은 URL |
 | 405 | `METHOD_NOT_ALLOWED` | 지원하지 않는 HTTP Method |
 | 409 | `DATA_CONFLICT` | DB 고유 제약 또는 무결성 충돌 |
 | 409 | `CONCURRENT_UPDATE_CONFLICT` | 낙관적·비관적 잠금 충돌 |
+| 409 | `INVALID_STATE` | 현재 상태에서 수행할 수 없는 요청 |
 | 413 | `UPLOAD_REQUEST_TOO_LARGE` | 서버 multipart 수신 제한 초과 |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | 지원하지 않는 요청 Content-Type |
+| 500 | `INTERNAL_SERVER_ERROR` | 예상하지 못한 서버 오류. 내부 상세는 응답하지 않음 |
 
 업무 규칙 오류 코드는 각 기능 문서에 별도로 정리한다.
 
@@ -250,6 +260,7 @@ Content-Disposition
 - 쿠키 기반 인증을 사용하지 않으므로 `allowCredentials=false`다.
 - 허용 Origin은 환경변수 `CORS_ALLOWED_ORIGINS`의 쉼표 구분 목록으로 설정한다.
 - 로컬 기본값은 `localhost`와 `127.0.0.1`의 5173·3000 포트다.
+- 동일한 CORS 정책은 `/api/**`와 프론트 상태 확인용 `/health`에 적용된다.
 
 ---
 

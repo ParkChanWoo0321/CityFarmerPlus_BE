@@ -5,11 +5,13 @@
 - 로컬 Base URL: `http://localhost:8080`
 - API 수: 2개
 
-> `PublicJobPostingController`, `PublicJobPostingService`, 검색 Specification과 `PublicJobPostingResponse` 구현 기준이다. 이름은 Public이지만 현재 Security 설정상 익명 API가 아니며 Bearer JWT가 필요하다.
+> `PublicJobPostingController`, `PublicJobPostingService`, 검색 Specification과 `PublicJobPostingResponse` 구현 기준이다. 목록과 상세 조회는 익명 호출이 가능하고 Bearer JWT는 개인화를 위한 선택 사항이다.
 
 ## 인증과 노출 범위
 
-- 활성 계정의 JWT 필수
+- JWT 없이 익명 조회 가능
+- 유효한 JWT를 보내면 현재 사용자의 지원 이력을 `myApplication`에 포함
+- Authorization 헤더를 보냈다면 JWT와 현재 계정 상태를 정상 검증
 - 특정 역할 제한 없음
 - 농가 프로필이 `APPROVED`이고 농가 계정이 활성 상태여야 함
 - 담당자 승인 이력인 `approvedAt`이 있어야 함
@@ -68,7 +70,7 @@
 ```
 
 - `wageUnit`: `HOURLY`, `DAILY`. 임금은 안내 정보이며 결제·송금·정산 기능은 없다.
-- 현재 사용자가 해당 공고에 지원한 이력이 없으면 `myApplication`은 `null`이다.
+- 익명 사용자이거나 현재 사용자가 해당 공고에 지원한 이력이 없으면 `myApplication`은 `null`이다.
 - 지원 취소·매칭 등 이력이 있으면 `myApplication.status`에 현재 지원 상태가 그대로 반환된다.
 - `acceptingApplications`는 응답 시점에 실제 지원 접수가 가능한지를 나타낸다. 지원 자격인 교육 인증까지 미리 판정하지는 않으며 최종 검증은 지원 API에서 수행한다.
 
@@ -98,8 +100,9 @@
 
 ```http
 GET /api/job-postings?keyword=청주&region=CHEONGJU&crop=감자&dateFrom=2026-09-01&dateTo=2026-09-30&workType=수확&recruitmentStatus=ALL&page=0&size=20
-Authorization: Bearer {{accessToken}}
 ```
+
+로그인 사용자의 지원 정보를 함께 받으려면 `Authorization: Bearer {{accessToken}}` 헤더를 선택적으로 추가한다.
 
 ### 응답
 
@@ -149,7 +152,7 @@ Authorization: Bearer {{accessToken}}
 |---:|---|---|
 | 400 | `VALIDATION_ERROR` | 문자열 길이, `page`, `size` 범위 오류 |
 | 400 | `INVALID_REQUEST_PARAMETER` | 지역·상태 enum, 날짜·숫자 형식 오류 |
-| 401 | `UNAUTHORIZED` / `INVALID_ACCOUNT` | JWT 누락·무효 또는 현재 계정 불일치 |
+| 401 | `UNAUTHORIZED` / `INVALID_ACCOUNT` | 선택적으로 보낸 JWT가 무효하거나 현재 계정과 불일치 |
 
 ## 2. 공고 상세
 
@@ -194,10 +197,7 @@ GET /api/job-postings/{postingId}?includeClosed=false
   "approvedAt": "2026-08-01T02:00:00Z",
   "recruitmentStatus": "CLOSED",
   "acceptingApplications": false,
-  "myApplication": {
-    "applicationId": 490,
-    "status": "WORK_COMPLETED"
-  }
+  "myApplication": null
 }
 ```
 
@@ -206,7 +206,7 @@ GET /api/job-postings/{postingId}?includeClosed=false
 | HTTP | `code` | 조건 |
 |---:|---|---|
 | 400 | `INVALID_REQUEST_PARAMETER` | ID나 boolean 형식 오류 |
-| 401 | `UNAUTHORIZED` / `INVALID_ACCOUNT` | 인증 실패 |
+| 401 | `UNAUTHORIZED` / `INVALID_ACCOUNT` | 선택적으로 보낸 JWT가 무효하거나 현재 계정과 불일치 |
 | 404 | `JOB_POSTING_NOT_OPEN` | 없거나 요청 범위에서 공개할 수 없는 공고 |
 
 없는 ID와 비공개 공고를 같은 404로 처리해 비공개 공고의 존재 여부를 노출하지 않는다.
@@ -215,16 +215,14 @@ GET /api/job-postings/{postingId}?includeClosed=false
 
 ```bash
 # 모집 중 기본 목록
-curl "{{baseUrl}}/api/job-postings?crop=감자&region=CHEONGJU&page=0&size=20" \
-  -H "Authorization: Bearer {{accessToken}}"
+curl "{{baseUrl}}/api/job-postings?crop=감자&region=CHEONGJU&page=0&size=20"
 
-# 모집 중과 마감 목록
+# 로그인 사용자의 지원 정보를 포함한 모집 중·마감 목록
 curl "{{baseUrl}}/api/job-postings?recruitmentStatus=ALL&page=0&size=20" \
   -H "Authorization: Bearer {{accessToken}}"
 
 # 마감 공고 상세
-curl "{{baseUrl}}/api/job-postings/99?includeClosed=true" \
-  -H "Authorization: Bearer {{accessToken}}"
+curl "{{baseUrl}}/api/job-postings/99?includeClosed=true"
 ```
 
 ## 현재 제한과 backend-2 경계
@@ -232,4 +230,4 @@ curl "{{baseUrl}}/api/job-postings/99?includeClosed=true" \
 - 이 API는 조회만 제공한다. 공고 승인·반려와 명시적 마감은 backend-2 중개센터 기능이다.
 - 지원자 매칭과 모집 인원 충족 마감도 backend-2에서 연결한다.
 - `capacity`는 모집 정원이지만 현재 지원자 수·매칭 인원 수는 공개 응답에 포함되지 않는다.
-- 익명 공개 페이지가 필요하다면 별도의 Security 정책 변경이 필요하다.
+- 공고 등록·수정·심사 요청·지원 API는 이 공개 조회 정책에 포함되지 않으며 기존 역할 인증이 필요하다.

@@ -197,7 +197,8 @@ public final class JobPostingSpecifications {
                         builder.asc(statusOrder),
                         builder.asc(root.get("workDate")),
                         builder.asc(root.get("startTime")),
-                        builder.desc(root.get("approvedAt"))
+                        builder.desc(root.get("approvedAt")),
+                        builder.asc(root.get("id"))
                 );
             }
             return builder.conjunction();
