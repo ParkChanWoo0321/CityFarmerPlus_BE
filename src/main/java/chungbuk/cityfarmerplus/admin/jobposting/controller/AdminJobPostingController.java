@@ -1,5 +1,6 @@
 package chungbuk.cityfarmerplus.admin.jobposting.controller;
 
+import chungbuk.cityfarmerplus.admin.jobposting.dto.AdminJobPostingUpdateRequest;
 import chungbuk.cityfarmerplus.admin.jobposting.dto.JobPostingMatchRequest;
 import chungbuk.cityfarmerplus.admin.jobposting.dto.JobPostingRejectRequest;
 import chungbuk.cityfarmerplus.admin.jobposting.service.AdminJobPostingMatchingService;
@@ -17,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -61,6 +63,48 @@ public class AdminJobPostingController {
                 postingId,
                 request
         ));
+    }
+
+    @PatchMapping("/{postingId}")
+    public ResponseEntity<JobPostingResponse> update(
+            Authentication authentication,
+            @PathVariable Long postingId,
+            @Valid @RequestBody AdminJobPostingUpdateRequest request
+    ) {
+        return ResponseEntity.ok(jobPostingService.update(
+                AuthenticatedUser.id(authentication),
+                postingId,
+                request
+        ));
+    }
+
+    @PostMapping("/{postingId}/close")
+    public ResponseEntity<JobPostingReviewResponse> close(
+            Authentication authentication,
+            @PathVariable Long postingId
+    ) {
+        return ResponseEntity.ok(jobPostingService.close(
+                AuthenticatedUser.id(authentication),
+                postingId
+        ));
+    }
+
+    @PostMapping("/{postingId}/cancel")
+    public ResponseEntity<JobPostingReviewResponse> cancel(
+            Authentication authentication,
+            @PathVariable Long postingId
+    ) {
+        return ResponseEntity.ok(jobPostingService.cancel(
+                AuthenticatedUser.id(authentication),
+                postingId
+        ));
+    }
+
+    @GetMapping("/{postingId}/review-history")
+    public ResponseEntity<List<JobPostingReviewResponse>> reviewHistory(
+            @PathVariable Long postingId
+    ) {
+        return ResponseEntity.ok(jobPostingService.getReviewHistory(postingId));
     }
 
     @GetMapping("/{postingId}/candidates")

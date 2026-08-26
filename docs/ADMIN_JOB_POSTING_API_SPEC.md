@@ -1,9 +1,9 @@
 # CityFarmerPlus 관리자 모집 공고 승인/반려 및 지원자 매칭 API 명세서
 
-- 문서 버전: 1.1
+- 문서 버전: 1.2
 - 작성일: 2026-08-26
 - 구현 기준 브랜치: `backend-2`
-- 적용 범위: 승인 대기 모집 공고 목록 조회, 승인, 반려, 지원자 후보 목록 조회(필터 없음), 지원자 배치 매칭 확정 (수정·마감·취소·심사 이력 조회·후보 필터 검색은 범위 밖)
+- 적용 범위: 승인 대기 모집 공고 목록 조회, 승인, 반려, 지원자 후보 목록 조회(필터 없음), 지원자 배치 매칭 확정, 모집 공고 수정·강제 마감·취소, 공고별 심사 이력 조회(관리자용) (후보 필터 검색은 범위 밖)
 
 ## 1. 공통 사항
 
@@ -51,6 +51,10 @@ Authorization: Bearer {{adminAccessToken}}
 | 모집 공고 반려 | `POST` | `/api/admin/job-postings/{postingId}/reject` | Bearer JWT (`ROLE_CENTER_ADMIN`) | `200 OK` |
 | 지원자 후보 목록 조회 | `GET` | `/api/admin/job-postings/{postingId}/candidates` | Bearer JWT (`ROLE_CENTER_ADMIN`) | `200 OK` |
 | 지원자 배치 매칭 확정 | `POST` | `/api/admin/job-postings/{postingId}/matches` | Bearer JWT (`ROLE_CENTER_ADMIN`) | `200 OK` |
+| 모집 공고 수정 | `PATCH` | `/api/admin/job-postings/{postingId}` | Bearer JWT (`ROLE_CENTER_ADMIN`) | `200 OK` |
+| 모집 공고 강제 마감 | `POST` | `/api/admin/job-postings/{postingId}/close` | Bearer JWT (`ROLE_CENTER_ADMIN`) | `200 OK` |
+| 모집 공고 취소 | `POST` | `/api/admin/job-postings/{postingId}/cancel` | Bearer JWT (`ROLE_CENTER_ADMIN`) | `200 OK` |
+| 공고별 심사 이력 조회 | `GET` | `/api/admin/job-postings/{postingId}/review-history` | Bearer JWT (`ROLE_CENTER_ADMIN`) | `200 OK` |
 
 ## 3. 승인 대기 공고 목록 조회
 
@@ -447,8 +451,10 @@ HTTP/1.1 200 OK
 |---|---|---|
 | `DRAFT` | 초안 또는 반려되어 되돌아온 상태 | 전이 불가(농가 본인용 API에서 생성/수정) |
 | `PENDING_REVIEW` | 심사 요청됨 | 전이 불가(농가 본인용 `submit-review` API에서 전환) |
-| `OPEN` | 승인되어 공개 모집 중, 매칭 대상 | `POST .../approve`로 진입, 정원 도달 시 `POST .../matches`가 자동으로 `CLOSED`로 전환 |
-| `CLOSED`/`CANCELLED`/`WORK_COMPLETED` | 마감/취소/근무완료 | 수동 마감·취소는 이 문서 범위 밖(다음 라운드 예정). 정원 도달에 의한 자동 `CLOSED`만 이번 범위에 포함 |
+| `OPEN` | 승인되어 공개 모집 중, 매칭 대상 | `POST .../approve`로 진입, 정원 도달 시 `POST .../matches`가 자동으로 `CLOSED`로 전환. `PATCH .../{postingId}`(수정)도 이 상태에서 가능(13장) |
+| `CLOSED` | 마감 | 정원 도달 자동 전환, 또는 `POST .../close`(관리자 강제 마감, 13장. `OPEN`에서만 가능) |
+| `CANCELLED` | 취소 | `POST .../cancel`(관리자 취소, 14장. `CANCELLED`·`WORK_COMPLETED`가 아니면 어떤 상태에서도 가능) |
+| `WORK_COMPLETED` | 근무완료 | 이 문서 범위 밖(근태 관리 기능) |
 
 ### 10.2 `JobPostingReview.action`
 
@@ -456,7 +462,9 @@ HTTP/1.1 200 OK
 |---|---|---|
 | `APPROVED` | 담당자 승인 | `POST .../approve` |
 | `REJECTED` | 담당자 반려(사유 필수) | `POST .../reject` |
-| `EDITED`/`CLOSED`/`CANCELLED` | 수정/마감/취소 이력 | 이 문서 범위 밖(다음 라운드 예정) |
+| `EDITED` | 담당자 수정(사유 필수) | `PATCH .../{postingId}`(12장) |
+| `CLOSED` | 담당자 강제 마감 | `POST .../close`(13장) |
+| `CANCELLED` | 담당자 취소 | `POST .../cancel`(14장) |
 
 ### 10.3 `JobApplication.status`
 
@@ -476,11 +484,306 @@ HTTP/1.1 200 OK
 
 ## 11. 현재 범위 밖 또는 미구현 기능
 
-- 모집 공고 수정, 마감, 취소 관리자 API(문서 7장의 다른 항목, 다음 라운드 예정)
-- 공고별 심사 이력 전체 조회(농가 본인용 `GET /api/farm/job-postings/{postingId}/review-history`는 이미 있으나, 관리자용 이력 조회는 이번 범위 밖)
+- 모집 공고 수정, 강제 마감, 취소, 공고별 심사 이력 조회(관리자용) — 12~15장에서 구현됨
 - 승인 대기 공고 목록 조회 필터(지역·작물·기간 등), 검색어
 - 승인·반려 취소(한 번 승인하면 `OPEN`에서 되돌릴 수 없고, 반려는 농가가 재수정·재제출해야 함)
 - 여러 공고 일괄 승인·반려
 - **지원자 후보 필터 조회**(지원 상태·희망 지역·근무 가능 요일·경험 횟수·농가 의견·시간 충돌 여부 등) — 다음 라운드에서 별도 진행 예정. 이번 7장의 목록 조회는 필터 없이 전체만 반환한다
 - 매칭 확정 취소(되돌리기), 근무 일정 취소 관리자 API
 - 배치 매칭 결과에 자동 `NOT_MATCHED` 처리된 지원자 목록을 함께 반환하는 기능(현재는 응답에 없고 후보 목록 재조회로만 확인 가능)
+
+## 12. 모집 공고 수정
+
+농가 본인용 수정(`PATCH /api/farm/job-postings/{postingId}`, `DRAFT` 상태만 가능)과 달리, 관리자는 **`DRAFT`·`PENDING_REVIEW`·`OPEN` 세 상태 모두**에서 공고 내용을 수정할 수 있다(`JobPosting.updateByAdmin()`). 전체 필드를 새 값으로 교체하는 방식이며 부분 수정은 지원하지 않는다.
+
+### 12.1 요청
+
+```http
+PATCH /api/admin/job-postings/12
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+```
+
+```json
+{
+  "reason": "농가 요청으로 근무 시간과 임금을 조정했습니다.",
+  "crop": "사과",
+  "workType": "수확",
+  "workDate": "2026-09-02",
+  "startTime": "08:00:00",
+  "endTime": "16:00:00",
+  "capacity": 5,
+  "meetingPlace": "충주시 사과농원 정문",
+  "wageAmount": 110000,
+  "wageUnit": "DAILY",
+  "supplies": "장갑, 모자",
+  "precautions": "미끄럼 주의",
+  "farmMessage": "초보자도 환영합니다.",
+  "applicantPreference": "체력 좋으신 분",
+  "title": "사과 수확 도우미 모집",
+  "description": "사과 수확 작업을 도와주실 분을 모집합니다.",
+  "beginnerGuide": "장갑 착용 후 조심히 따주세요."
+}
+```
+
+| 필드 | 타입 | 필수 | 제약 조건 |
+|---|---|---|---|
+| `reason` | String | O | 공백만 입력 불가, 최대 1000자(`JobPostingReview.reason`으로 기록) |
+| `crop` | String | O | 공백 불가, 50자 이하 |
+| `workType` | String | O | 공백 불가, 100자 이하 |
+| `workDate` | LocalDate | O | 오늘 또는 미래 날짜(`@FutureOrPresent`) |
+| `startTime`/`endTime` | LocalTime | O | `endTime`이 `startTime`보다 늦어야 함(`JobPostingScheduleValidator`) |
+| `capacity` | int | O | 1~1000, **이미 확정(`MATCHED`)된 인원 수 이상**이어야 함 |
+| `meetingPlace` | String | O | 공백 불가, 255자 이하 |
+| `wageAmount` | int | O | 1~100,000,000 |
+| `wageUnit` | Enum | O | `HOURLY`, `DAILY` |
+| `supplies` | String | X | 1000자 이하 |
+| `precautions` | String | X | 2000자 이하 |
+| `farmMessage` | String | X | 1000자 이하 |
+| `applicantPreference` | String | X | 1000자 이하 |
+| `title` | String | O | 공백 불가, 150자 이하 |
+| `description` | String | O | 공백 불가, 5000자 이하 |
+| `beginnerGuide` | String | X | 2000자 이하 |
+
+농가용 `JobPostingUpsertRequest`와 필드 구성이 같지만(`reason`만 추가), 두 DTO는 이 코드베이스의 다른 요청 DTO들처럼 평면(flat) 레코드 관례를 따르기 위해 서로 독립된 타입이다.
+
+작업 날짜·시간은 실제로 `endTime.isAfter(startTime)`와 `workDate.atTime(startTime)`이 현재 시각 이후인지까지 `JobPostingScheduleValidator`가 재검증한다(단순 날짜 레벨의 `@FutureOrPresent`보다 엄격하다) — 농가 본인용 생성·수정 API와 동일한 검증기를 재사용한다.
+
+### 12.2 성공 응답
+
+```http
+HTTP/1.1 200 OK
+```
+
+승인/반려와 달리 이 API는 **`JobPostingReview`가 아니라 갱신된 `JobPosting` 전체(`JobPostingResponse`)**를 반환한다 — 바뀐 필드 값(정원·임금·일정 등)을 한 번에 확인할 수 있도록 하기 위함이다. `latestReviewAction`에 방금 기록된 `EDITED`가 채워진다.
+
+```json
+{
+  "id": 12,
+  "farmProfileId": 7,
+  "farmName": "충주 사과농원",
+  "cityCounty": "CHUNGJU",
+  "farmAddress": "충청북도 충주시 예시로 1",
+  "contactNumber": "01012345678",
+  "crop": "사과",
+  "workType": "수확",
+  "workDate": "2026-09-02",
+  "startTime": "08:00:00",
+  "endTime": "16:00:00",
+  "capacity": 5,
+  "meetingPlace": "충주시 사과농원 정문",
+  "wageAmount": 110000,
+  "wageUnit": "DAILY",
+  "supplies": "장갑, 모자",
+  "precautions": "미끄럼 주의",
+  "farmMessage": "초보자도 환영합니다.",
+  "applicantPreference": "체력 좋으신 분",
+  "title": "사과 수확 도우미 모집",
+  "description": "사과 수확 작업을 도와주실 분을 모집합니다.",
+  "beginnerGuide": "장갑 착용 후 조심히 따주세요.",
+  "status": "OPEN",
+  "displayStatus": "APPROVED",
+  "reviewRequestedAt": "2026-08-24T00:00:00Z",
+  "approvedAt": "2026-08-25T09:00:00Z",
+  "closedAt": null,
+  "cancelledAt": null,
+  "createdAt": "2026-08-23T00:00:00Z",
+  "updatedAt": "2026-08-26T09:10:00Z",
+  "latestReviewAction": "EDITED",
+  "latestReviewReason": "농가 요청으로 근무 시간과 임금을 조정했습니다.",
+  "latestReviewedAt": "2026-08-26T09:10:00Z"
+}
+```
+
+### 12.3 오류 응답
+
+| 상태 | 코드 | 발생 조건 |
+|---|---|---|
+| `400` | `VALIDATION_ERROR` | `reason` 누락(공백 포함) 또는 1000자 초과, 그 외 필드 형식·길이 위반 |
+| `400` | `PAST_WORK_DATE` | 작업 시작 일시(`workDate`+`startTime`)가 현재 이전 |
+| `400` | `INVALID_JOB_POSTING_DETAILS` | `endTime`이 `startTime`보다 늦지 않음, 또는 그 외 상세 정보 형식 오류 |
+| `401` | `UNAUTHORIZED` | JWT 누락, 만료 또는 위조 |
+| `403` | `ACCESS_DENIED` | `CENTER_ADMIN`이 아닌 계정의 JWT로 접근(URL 패턴 단계) |
+| `403` | `CENTER_ADMIN_ROLE_REQUIRED` | JWT는 유효하지만 DB상 해당 계정이 `CENTER_ADMIN`이 아니거나 삭제됨 |
+| `403` | `INACTIVE_ACCOUNT` | 관리자 계정이 정지·탈퇴 상태 |
+| `404` | `USER_NOT_FOUND` | JWT의 관리자 ID에 해당하는 회원이 없음 |
+| `404` | `JOB_POSTING_NOT_FOUND` | 해당 `postingId`의 공고가 없음 |
+| `409` | `INVALID_JOB_POSTING_STATE` | 공고가 `DRAFT`·`PENDING_REVIEW`·`OPEN` 중 어느 것도 아님(예: `CLOSED`, `CANCELLED`, `WORK_COMPLETED`) |
+| `409` | `CAPACITY_BELOW_MATCHED_COUNT` | 새 `capacity`가 이미 확정(`MATCHED`)된 지원자 수보다 작음 |
+
+정원 축소 오류 예시:
+
+```json
+{
+  "code": "CAPACITY_BELOW_MATCHED_COUNT",
+  "message": "이미 확정된 인원보다 모집 인원을 적게 수정할 수 없습니다."
+}
+```
+
+## 13. 모집 공고 강제 마감
+
+`OPEN` 상태의 공고만 관리자가 강제로 마감할 수 있다(`JobPosting.close()`). 정원 도달 시 8장의 매칭 API가 자동으로 마감하는 것과 별개로, 정원이 남아 있어도 관리자 판단으로 조기 마감할 때 쓴다.
+
+### 13.1 요청
+
+```http
+POST /api/admin/job-postings/12/close
+Authorization: Bearer {{adminAccessToken}}
+```
+
+이 API는 요청 본문을 받지 않는다(사유 입력 필드 없음).
+
+### 13.2 성공 응답
+
+```http
+HTTP/1.1 200 OK
+```
+
+승인/반려와 동일하게 방금 기록된 `JobPostingReview` 감사 로그를 반환한다(`JobPostingReviewResponse`).
+
+```json
+{
+  "id": 32,
+  "reviewerUserId": 3,
+  "reviewerName": "충북 담당자",
+  "action": "CLOSED",
+  "reason": null,
+  "titleSnapshot": "사과 수확 도우미 모집",
+  "descriptionSnapshot": "사과 수확 작업을 도와주실 분을 모집합니다.",
+  "createdAt": "2026-08-26T09:15:00Z"
+}
+```
+
+### 13.3 오류 응답
+
+| 상태 | 코드 | 발생 조건 |
+|---|---|---|
+| `401` | `UNAUTHORIZED` | JWT 누락, 만료 또는 위조 |
+| `403` | `ACCESS_DENIED` | `CENTER_ADMIN`이 아닌 계정의 JWT로 접근(URL 패턴 단계) |
+| `403` | `CENTER_ADMIN_ROLE_REQUIRED` | JWT는 유효하지만 DB상 해당 계정이 `CENTER_ADMIN`이 아니거나 삭제됨 |
+| `403` | `INACTIVE_ACCOUNT` | 관리자 계정이 정지·탈퇴 상태 |
+| `404` | `USER_NOT_FOUND` | JWT의 관리자 ID에 해당하는 회원이 없음 |
+| `404` | `JOB_POSTING_NOT_FOUND` | 해당 `postingId`의 공고가 없음 |
+| `409` | `INVALID_JOB_POSTING_STATE` | 공고가 `OPEN` 상태가 아님 |
+
+## 14. 모집 공고 취소
+
+`CANCELLED`·`WORK_COMPLETED` 상태가 아니라면 어떤 상태(`DRAFT`, `PENDING_REVIEW`, `OPEN`, `CLOSED`)의 공고든 관리자가 취소할 수 있다(`JobPosting.cancel()`). 참조 무결성 때문에 공고를 물리 삭제하는 API는 없고, 지원자가 이미 있는 공고도 이 취소 API로 `CANCELLED` 상태로 남긴다.
+
+**이 API는 공고 하나만 취소하는 게 아니라, 관련 지원·근무 일정까지 같은 트랜잭션 안에서 함께 정리한다.** 농가 본인용 취소(`POST /api/farm/job-postings/{postingId}/cancel`)는 `MATCHED`·`WORK_COMPLETED` 지원이 하나라도 있으면 취소 자체를 막아버리지만, 관리자 취소는 매칭 이후 단계에서도 강제로 취소할 수 있어야 하므로 다음을 함께 처리한다.
+
+1. `JobPosting.cancel()` — 공고 상태를 `CANCELLED`로 전환.
+2. 이 공고에 속한 **모든** `JobApplication`에 `cancelWithPostingByAdmin()`을 호출 — `APPLIED`·`MATCHED`·`NO_SHOW` 상태만 `POSTING_CANCELLED`로 바뀌고(엔티티 내부 가드), 이미 `WITHDRAWN`/`NOT_MATCHED`/`WORK_COMPLETED`/`POSTING_CANCELLED`인 지원은 조용히 그대로 둔다. 상태별로 걸러서 조회하지 않고 전체에 호출해도 안전하다.
+3. 이 공고에 속한 `WorkAssignment` 중 **`SCHEDULED`인 것만** `cancel()`을 호출해 `WorkStatus.CANCELLED`로 전환한다. `COMPLETED`·`NO_SHOW`인 근무 일정은 건드리지 않는다 — `WorkAssignment.cancel()` 자체의 가드는 `COMPLETED`/`CANCELLED`만 막고 `NO_SHOW`는 막지 않으므로, 서비스 레이어(`AdminJobPostingService.cancel()`)에서 `status == SCHEDULED`인 것만 걸러서 호출한다.
+
+동시성은 별도 비관적 락 없이 `JobPosting.getForUpdate()`(1번 전에 이미 획득)와 각 엔티티의 `@Version` 낙관적 잠금으로 처리한다 — `JobApplication`/`WorkAssignment`를 바꾸는 다른 모든 경로(출결 등록, 근무 완료, 지원 철회, 매칭 확정)가 전부 `JobPosting`을 먼저 잠그고 들어오므로 이 취소 트랜잭션과 자연히 직렬화된다.
+
+### 14.1 요청
+
+```http
+POST /api/admin/job-postings/12/cancel
+Authorization: Bearer {{adminAccessToken}}
+```
+
+이 API는 요청 본문을 받지 않는다(사유 입력 필드 없음).
+
+### 14.2 성공 응답
+
+```http
+HTTP/1.1 200 OK
+```
+
+```json
+{
+  "id": 33,
+  "reviewerUserId": 3,
+  "reviewerName": "충북 담당자",
+  "action": "CANCELLED",
+  "reason": null,
+  "titleSnapshot": "사과 수확 도우미 모집",
+  "descriptionSnapshot": "사과 수확 작업을 도와주실 분을 모집합니다.",
+  "createdAt": "2026-08-26T09:20:00Z"
+}
+```
+
+### 14.3 오류 응답
+
+| 상태 | 코드 | 발생 조건 |
+|---|---|---|
+| `401` | `UNAUTHORIZED` | JWT 누락, 만료 또는 위조 |
+| `403` | `ACCESS_DENIED` | `CENTER_ADMIN`이 아닌 계정의 JWT로 접근(URL 패턴 단계) |
+| `403` | `CENTER_ADMIN_ROLE_REQUIRED` | JWT는 유효하지만 DB상 해당 계정이 `CENTER_ADMIN`이 아니거나 삭제됨 |
+| `403` | `INACTIVE_ACCOUNT` | 관리자 계정이 정지·탈퇴 상태 |
+| `404` | `USER_NOT_FOUND` | JWT의 관리자 ID에 해당하는 회원이 없음 |
+| `404` | `JOB_POSTING_NOT_FOUND` | 해당 `postingId`의 공고가 없음 |
+| `409` | `INVALID_JOB_POSTING_STATE` | 공고가 이미 `CANCELLED` 또는 `WORK_COMPLETED` 상태임 |
+
+## 15. 공고별 심사 이력 조회(관리자용)
+
+농가 본인용 이력 조회(`GET /api/farm/job-postings/{postingId}/review-history`, 소유권 확인 필요)와 같은 저장소 조회(`JobPostingReviewRepository.findByJobPostingIdOrderByCreatedAtDescIdDesc`)와 응답 DTO(`JobPostingReviewResponse`)를 그대로 재사용한다. 관리자는 소유 농가와 무관하게 모든 공고의 이력을 조회할 수 있다.
+
+### 15.1 요청
+
+```http
+GET /api/admin/job-postings/12/review-history
+Authorization: Bearer {{adminAccessToken}}
+```
+
+### 15.2 성공 응답
+
+```http
+HTTP/1.1 200 OK
+```
+
+최신순(`createdAt` 내림차순, 동시각이면 `id` 내림차순)으로 전체 이력을 배열로 반환한다. 페이지네이션은 없다.
+
+```json
+[
+  {
+    "id": 33,
+    "reviewerUserId": 3,
+    "reviewerName": "충북 담당자",
+    "action": "CANCELLED",
+    "reason": null,
+    "titleSnapshot": "사과 수확 도우미 모집",
+    "descriptionSnapshot": "사과 수확 작업을 도와주실 분을 모집합니다.",
+    "createdAt": "2026-08-26T09:20:00Z"
+  },
+  {
+    "id": 32,
+    "reviewerUserId": 3,
+    "reviewerName": "충북 담당자",
+    "action": "EDITED",
+    "reason": "농가 요청으로 근무 시간과 임금을 조정했습니다.",
+    "titleSnapshot": "사과 수확 도우미 모집",
+    "descriptionSnapshot": "사과 수확 작업을 도와주실 분을 모집합니다.",
+    "createdAt": "2026-08-26T09:10:00Z"
+  },
+  {
+    "id": 30,
+    "reviewerUserId": 3,
+    "reviewerName": "충북 담당자",
+    "action": "APPROVED",
+    "reason": null,
+    "titleSnapshot": "사과 수확 도우미 모집",
+    "descriptionSnapshot": "사과 수확 작업을 도와주실 분을 모집합니다.",
+    "createdAt": "2026-08-25T09:00:00Z"
+  }
+]
+```
+
+이력이 없으면(아직 승인·반려·수정·마감·취소가 한 번도 없었던 공고) `200 OK`와 `[]`을 반환한다.
+
+### 15.3 오류 응답
+
+| 상태 | 코드 | 발생 조건 |
+|---|---|---|
+| `401` | `UNAUTHORIZED` | JWT 누락, 만료 또는 위조 |
+| `403` | `ACCESS_DENIED` | `CENTER_ADMIN`이 아닌 계정의 JWT로 접근(URL 패턴 단계) |
+| `404` | `JOB_POSTING_NOT_FOUND` | 해당 `postingId`의 공고가 없음 |
+
+이 API는 목록 조회(3장)와 마찬가지로 관리자 역할을 서비스 레이어에서 다시 조회하지 않는다(`requireCenterAdmin` 미호출) — 단순 읽기 전용 조회라 승인/반려/수정/마감/취소처럼 `JobPostingReview`에 심사자를 기록할 필요가 없기 때문이다. 따라서 `CENTER_ADMIN_ROLE_REQUIRED`/`INACTIVE_ACCOUNT`/`USER_NOT_FOUND`는 이 API에는 없다.
+
+## 16. 다음 라운드로 미룬 항목
+
+- 마감·취소 API에 사유(`reason`) 입력 필드 추가 여부(현재는 수정만 사유 필수, 마감·취소는 감사 로그에 `reason=null`로 기록됨)

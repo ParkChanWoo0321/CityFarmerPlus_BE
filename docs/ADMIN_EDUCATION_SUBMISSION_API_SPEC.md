@@ -362,5 +362,5 @@ HTTP/1.1 200 OK
 - 목록 조회 상태 필터(현재 `PENDING_REVIEW` 고정), 과정별·도시농부별 검색
 - 승인·반려 취소 또는 재심사(한 번 전이하면 되돌릴 수 없음)
 - 이수증 첨부 파일 다운로드(별도 `EducationDocumentDownloadService`/API 영역, 이 문서 범위 밖)
-- 교육 과정 관리(등록·수정·비활성화) CRUD API — 다음 라운드 예정
+- 교육 과정 관리(등록·수정·비활성화) CRUD API — [`ADMIN_EDUCATION_COURSE_API_SPEC.md`](ADMIN_EDUCATION_COURSE_API_SPEC.md)에서 별도로 구현됨
 - 여러 제출 건 일괄 승인·반려

@@ -40,4 +40,8 @@ public class JobPostingException extends DomainException {
     public static JobPostingException activeMatchesExist() {
         return new JobPostingException(HttpStatus.CONFLICT, "ACTIVE_MATCHES_EXIST", "확정된 근무자가 있는 공고는 농가가 취소할 수 없습니다.");
     }
+
+    public static JobPostingException capacityBelowMatchedCount() {
+        return new JobPostingException(HttpStatus.CONFLICT, "CAPACITY_BELOW_MATCHED_COUNT", "이미 확정된 인원보다 모집 인원을 적게 수정할 수 없습니다.");
+    }
 }
