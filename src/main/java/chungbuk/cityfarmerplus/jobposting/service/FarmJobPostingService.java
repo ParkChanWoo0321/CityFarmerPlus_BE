@@ -82,12 +82,13 @@ public class FarmJobPostingService {
                 Sort.Order.desc("id")
         ));
         ZonedDateTime now = ZonedDateTime.now(SERVICE_ZONE);
-        Specification<JobPosting> specification = Specification
-                .where(JobPostingSpecifications.belongsToFarmOwner(userId))
-                .and(displayStatusSpecification(
-                        displayStatus,
-                        now
-                ));
+        Specification<JobPosting> specification =
+                JobPostingSpecifications.belongsToFarmOwner(userId);
+        Specification<JobPosting> displaySpecification =
+                displayStatusSpecification(displayStatus, now);
+        if (displaySpecification != null) {
+            specification = specification.and(displaySpecification);
+        }
         var postings = jobPostingRepository.findAll(specification, pageable);
         return new PageResponse<>(
                 responseAssembler.assembleAll(postings.getContent()),
