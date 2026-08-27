@@ -1,8 +1,9 @@
 # 모집 공고 공개 조회 API
 
 - 기준일: 2026-08-20
-- 기준: 현재 `backend-1` 코드
+- 기준: 현재 `main` 통합 코드
 - 로컬 Base URL: `http://localhost:8080`
+- 운영 Base URL: `https://cityfarmerplus-api-82951616760.us-west1.run.app`
 - API 수: 2개
 
 > `PublicJobPostingController`, `PublicJobPostingService`, 검색 Specification과 `PublicJobPostingResponse` 구현 기준이다. 목록과 상세 조회는 익명 호출이 가능하고 Bearer JWT는 개인화를 위한 선택 사항이다.
@@ -225,9 +226,9 @@ curl "{{baseUrl}}/api/job-postings?recruitmentStatus=ALL&page=0&size=20" \
 curl "{{baseUrl}}/api/job-postings/99?includeClosed=true"
 ```
 
-## 현재 제한과 backend-2 경계
+## 현재 제한과 중개센터 역할 경계
 
-- 이 API는 조회만 제공한다. 공고 승인·반려와 명시적 마감은 backend-2 중개센터 기능이다.
-- 지원자 매칭과 모집 인원 충족 마감도 backend-2에서 연결한다.
+- 이 API는 조회만 제공한다. 공고 승인·반려와 명시적 마감은 현재 통합된 `CENTER_ADMIN` 중개센터 API가 처리한다.
+- 지원자 매칭과 모집 인원 충족 마감은 `POST /api/admin/job-postings/{postingId}/matches`가 처리한다.
 - `capacity`는 모집 정원이지만 현재 지원자 수·매칭 인원 수는 공개 응답에 포함되지 않는다.
 - 공고 등록·수정·심사 요청·지원 API는 이 공개 조회 정책에 포함되지 않으며 기존 역할 인증이 필요하다.

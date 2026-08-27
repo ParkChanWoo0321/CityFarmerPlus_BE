@@ -1,7 +1,7 @@
 # CityFarmerPlus 사용자 API 요약 명세
 
-- 기준일: 2026-08-26
-- 사용자 HTTP 작업 수: 66개 (전체 110개 중 관리자 42개와 health 2개는 `API_SPEC_INDEX.md`의 별도 명세 참조)
+- 기준일: 2026-08-27
+- 사용자 HTTP 작업 수: 67개 (전체 111개 중 관리자 42개와 health 2개는 `API_SPEC_INDEX.md`의 별도 명세 참조)
 - 기준 코드: 현재 Controller·DTO·Security·Service
 - 상세 필드·오류·상태 규칙: [FULL_API_SPEC.md](FULL_API_SPEC.md)
 
@@ -11,7 +11,13 @@
 
 ## 1. 공통 요청 규칙
 
-기본 URL:
+운영 URL:
+
+```text
+https://cityfarmerplus-api-82951616760.us-west1.run.app
+```
+
+로컬 URL:
 
 ```text
 http://localhost:8080
@@ -23,7 +29,7 @@ http://localhost:8080
 Authorization: Bearer {{accessToken}}
 ```
 
-인증 없이 호출 가능한 API는 회원가입, 아이디 확인, 로그인, 활성 교육 과정 조회, 공개 공고 목록·상세, FAQ다. 그 외 API는 JWT가 필요하다. 공고 조회에 유효한 JWT를 선택적으로 보내면 현재 사용자의 지원 정보가 포함된다.
+인증 없이 호출 가능한 API는 회원가입, 아이디 확인, 로그인, 활성 교육 과정 조회, 공개 공고 목록·상세, FAQ, KAMIS 최근 조사 가격, health와 최초 담당자 발급 API다. 최초 담당자 발급 API는 별도 provisioning key가 설정된 동안만 사용할 수 있다. 그 외 API는 JWT가 필요하다. 공고 조회에 유효한 JWT를 선택적으로 보내면 현재 사용자의 지원 정보가 포함된다.
 
 JSON 오류 형식:
 
@@ -55,7 +61,7 @@ JSON 오류 형식:
 |---|---|---|
 | `URBAN_FARMER` | 도시농부 | 가능 |
 | `FARM` | 농가 | 가능 |
-| `CENTER_ADMIN` | backend-2 담당자 공통 역할 | 불가능 |
+| `CENTER_ADMIN` | 중개센터 담당자 | 불가능 |
 
 한 계정은 하나의 역할만 가진다. `CENTER_ADMIN` 발급과 담당자 업무 API는 사용자 API와 분리되어 있으며 관리자 전용 명세를 따른다.
 
@@ -63,11 +69,11 @@ JSON 오류 형식:
 
 | 접근 구분 | 개수 |
 |---|---:|
-| 공개 | 4 |
-| 로그인 사용자 공통 | 9 |
+| 공개 | 8 |
+| 로그인 사용자 공통 | 6 |
 | 도시농부 전용 | 29 |
 | 농가 전용 | 24 |
-| 합계 | **66** |
+| 합계 | **67** |
 
 ---
 
@@ -267,6 +273,16 @@ AI는 현재 외부 LLM이 아닌 규칙 기반 미리보기다. 공개 목록�
 | 내 상담 이력 | `GET` | `/api/ai/support/messages` | 활성 계정 | `200` |
 
 AI 상담도 현재 규칙 기반이며 확정되지 않은 행정 답변에는 공식 확인 필요 여부를 표시한다.
+
+---
+
+# 기능 11. KAMIS 최근 조사 가격 — 1개
+
+| 기능 | Method | URL | 권한 | 성공 |
+|---|---|---|---|---|
+| 최근 조사 가격 | `GET` | `/api/market-prices/latest` | 공개 | `200` |
+
+`marketType=RETAIL|WHOLESALE`, `categoryCode`, `keyword`, `page`, `size` 필터를 지원한다. 실시간 체결가가 아니라 KAMIS 최근 조사일 기준 가격이며 응답의 `observedDate`를 화면에 함께 표시한다. `stale=true`이면 KAMIS 일시 장애로 24시간 이내 마지막 성공값을 반환한 것이다. 자세한 계약은 `docs/notion/16_MARKET_PRICE.md`를 따른다.
 
 ---
 

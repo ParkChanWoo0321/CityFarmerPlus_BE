@@ -1,8 +1,9 @@
 # CityFarmerPlus 도시농부 프로필 API 명세서
 
 - 기준일: 2026-08-20
-- 기준 소스: 현재 `backend-1` 작업 폴더의 `UrbanFarmerProfileController`, DTO, Service, Entity 및 공통 인증·예외 코드
+- 기준 소스: 현재 `main` 통합 코드의 `UrbanFarmerProfileController`, DTO, Service, Entity 및 공통 인증·예외 코드
 - 로컬 Base URL: `http://localhost:8080`
+- 운영 Base URL: `https://cityfarmerplus-api-82951616760.us-west1.run.app`
 - API 수: 3개
 
 > 도시농부 계정의 활동 경험과 농업경영체 등록 여부를 관리하는 API다. `/api/auth/me`의 기본 회원 정보와 별도 데이터이며, 중개센터 전용 API는 포함하지 않는다.

@@ -1,11 +1,12 @@
 # CityFarmerPlus 교육 과정·이수증 인증 API
 
-- 기준일: 2026-08-20
-- 기준 소스: 현재 `backend-1` 작업 폴더의 교육 Controller, DTO, Service, Entity, Repository, 파일 Validator
+- 기준일: 2026-08-27
+- 기준 소스: 통합 코드의 교육 사용자·관리자 Controller, DTO, Service, Entity, Repository, 파일 Validator
 - 로컬 Base URL: `http://localhost:8080`
+- 운영 Base URL: `https://cityfarmerplus-api-82951616760.us-west1.run.app`
 - 구현 API: 6개
 
-> 이 문서는 다른 문서를 보지 않아도 노션에 단독으로 복사할 수 있는 교육 기능 명세다. 현재 backend-1에는 도시농부의 과정 조회·진행 상태 조회·이수증 제출·본인 이력 조회·본인 파일 다운로드만 있다. 담당자의 승인·반려 API와 교육 과정 관리 API는 구현 범위에 포함되지 않는다.
+> 이 문서는 도시농부용 교육 API를 노션에 단독으로 복사할 수 있게 정리한다. 중개센터의 과정 관리와 이수증 심사 API는 통합돼 있으며 요청·응답 상세는 `ADMIN_EDUCATION_COURSE_API_SPEC.md`, `ADMIN_EDUCATION_SUBMISSION_API_SPEC.md`를 따른다.
 
 ---
 
@@ -21,7 +22,7 @@
 - 한 과정은 미제출 상태이거나 최신 제출이 `REJECTED`일 때만 새 이수증을 제출할 수 있다.
 - 제출된 회차와 파일은 덮어쓰지 않는다. 반려 후 재제출하면 새 회차가 추가되고 과거 제출은 유지된다.
 - 제출 직후 상태는 `PENDING_REVIEW`다.
-- 승인·반려 결과는 backend-2 담당자 기능이 같은 도메인 모델에 저장하는 구조다.
+- 승인·반려 결과는 통합된 중개센터 담당자 API가 같은 도메인 모델에 저장한다.
 
 공고 지원 API에서는 다음 조건을 다시 검사한다.
 
@@ -375,8 +376,8 @@ Content-Type: application/json
 
 ```text
 과정 미제출 ──제출──> PENDING_REVIEW
-PENDING_REVIEW ──backend-2 승인──> APPROVED
-PENDING_REVIEW ──backend-2 반려──> REJECTED
+PENDING_REVIEW ──CENTER_ADMIN 승인──> APPROVED
+PENDING_REVIEW ──CENTER_ADMIN 반려──> REJECTED
 REJECTED ──재제출──> 새 PENDING_REVIEW 회차
 ```
 
@@ -535,9 +536,9 @@ Postman form-data 예시:
 
 ---
 
-## 13. backend-2 담당자 기능과의 경계
+## 13. 중개센터 담당자 기능 연동
 
-현재 backend-1에는 다음 HTTP API가 없다.
+현재 통합 코드에는 다음 HTTP API가 구현돼 있다.
 
 - 교육 과정 생성·수정·비활성화 API
 - 심사 대기 이수증 목록·상세 API
@@ -545,16 +546,16 @@ Postman form-data 예시:
 - 이수증 반려 API
 - 담당자용 이수증 다운로드 API
 
-다만 병합을 위해 다음 데이터 계약은 이미 존재한다.
+사용자와 담당자 API는 다음 데이터 계약을 공유한다.
 
 - 담당자 역할 `CENTER_ADMIN`
 - 제출 상태 `PENDING_REVIEW`, `APPROVED`, `REJECTED`
 - `reviewedByUserId`, `reviewedAt`, `recognizedHours`, `rejectionReason`
 - 전체 인증 상태 `NOT_SUBMITTED`, `PENDING_REVIEW`, `PARTIALLY_APPROVED`, `APPROVED`, `REJECTED`
 
-backend-2는 심사 목록과 건수에 `EducationCertificateSubmissionRepository.findAllByStatus`와 `countByStatus`, 심사 변경용 잠금 조회에 `findByIdForUpdate`를 사용한다. 이 공용 Repository 계약은 모두 제출 회원의 `accountStatus=ACTIVE`를 조건으로 포함한다. 따라서 탈퇴 직전 화면에 보였던 건도 심사 시 다시 잠금 조회해야 하며, 비활성 계정이면 처리하지 않는다.
+담당자 서비스는 심사 목록과 건수에 `EducationCertificateSubmissionRepository.findAllByStatus`와 `countByStatus`, 심사 변경용 잠금 조회에 `findByIdForUpdate`를 사용한다. 이 공용 Repository 계약은 모두 제출 회원의 `accountStatus=ACTIVE`를 조건으로 포함한다. 따라서 탈퇴 직전 화면에 보였던 건도 심사 시 다시 잠금 조회하며, 비활성 계정이면 처리하지 않는다.
 
-따라서 backend-1만 실행하면 이수증을 제출해 `PENDING_REVIEW`까지 만들 수 있지만, 정상 HTTP 흐름만으로 직접 `APPROVED` 또는 `REJECTED`를 만들 수 없다.
+도시농부가 이수증을 제출해 `PENDING_REVIEW`로 만들고, `CENTER_ADMIN`이 담당자 API로 `APPROVED` 또는 `REJECTED`로 심사한다.
 
 ---
 
@@ -568,5 +569,5 @@ backend-2는 심사 목록과 건수에 `EducationCertificateSubmissionRepositor
 6. 이력과 상세 API에서 회차·과정 스냅샷·파일 순서를 확인한다.
 7. 파일 다운로드 응답의 `Content-Type`, `Content-Length`, `Content-Disposition`을 확인한다.
 8. 같은 과정에 즉시 재제출해 `409 EDUCATION_SUBMISSION_NOT_ALLOWED`를 확인한다.
-9. backend-2 심사 기능 병합 후 반려 처리하고 재제출 회차가 증가하는지 확인한다.
+9. 중개센터 심사 API로 반려 처리하고 재제출 회차가 증가하는지 확인한다.
 10. 모든 활성 필수 과정 승인 후 `eligibleToApply=true`인지 확인한다.

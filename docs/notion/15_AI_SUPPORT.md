@@ -1,8 +1,9 @@
 # AI 행정 상담 API
 
 - 기준일: 2026-08-20
-- 기준: 현재 `backend-1` 코드
+- 기준: 현재 `main` 통합 코드
 - 로컬 Base URL: `http://localhost:8080`
+- 운영 Base URL: `https://cityfarmerplus-api-82951616760.us-west1.run.app`
 - API 수: 2개
 
 ## 개요
@@ -176,26 +177,26 @@
 
 ```bash
 # 질문 전송
-curl -X POST "http://localhost:8080/api/ai/support/messages" \
+curl -X POST "{{baseUrl}}/api/ai/support/messages" \
   -H "Authorization: Bearer {{accessToken}}" \
   -H "Content-Type: application/json" \
   -d '{"message":"교육 이수증은 어떻게 제출하나요?"}'
 
 # 내 이력
-curl "http://localhost:8080/api/ai/support/messages?page=0&size=20" \
+curl "{{baseUrl}}/api/ai/support/messages?page=0&size=20" \
   -H "Authorization: Bearer {{accessToken}}"
 ```
 
 Postman 질문 전송:
 
 1. Method `POST`
-2. URL `http://localhost:8080/api/ai/support/messages`
+2. URL `{{baseUrl}}/api/ai/support/messages`
 3. Authorization → Bearer Token → `{{accessToken}}`
 4. Body → raw → JSON
 
-## 현재 제한과 `backend-2` 경계
+## 현재 제한과 중개센터 확장 경계
 
 - 현재 답변은 키워드 규칙 기반이므로 질문을 완전히 이해하거나 개별 사례를 판단하지 못한다.
 - `officialConfirmationRequired` 값은 확인 필요성을 알리는 표시일 뿐, 자동으로 담당자에게 문의를 전달하지 않는다.
-- 담당자 질문 수신/답변/배정 API는 없다. 해당 행정 상담을 운영하려면 `backend-2` 중개센터 범위에서 별도로 연결해야 한다.
+- 담당자 질문 수신·답변·배정 API는 현재 없다. 해당 행정 상담을 운영하려면 향후 `CENTER_ADMIN` 중개센터 기능으로 별도 확장해야 한다.
 - 상담 이력 삭제 API는 현재 없다. 또한 `SupportInquiry`를 삭제하는 회원 탈퇴 `AccountDataCleaner`가 구현되어 있지 않아 탈퇴 후에도 DB 행은 유지된다. 단, 탈퇴 계정으로는 인증할 수 없어 이력 API에 접근할 수 없다.

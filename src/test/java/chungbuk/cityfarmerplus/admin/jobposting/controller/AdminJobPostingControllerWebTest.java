@@ -65,6 +65,21 @@ class AdminJobPostingControllerWebTest {
                 .andExpect(jsonPath("$.number").doesNotExist());
     }
 
+    @Test
+    void listCapsRequestedPageSizeAtTheGlobalContractLimit() throws Exception {
+        when(jwtDecoder.decode("admin-jwt")).thenReturn(jwt("30", "CENTER_ADMIN"));
+        when(jobPostingService.list(any())).thenAnswer(invocation -> {
+            org.springframework.data.domain.Pageable pageable = invocation.getArgument(0);
+            return new PageImpl<>(List.of(), pageable, 0);
+        });
+
+        mockMvc.perform(get("/api/admin/job-postings")
+                        .queryParam("size", "500")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer admin-jwt"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.size").value(100));
+    }
+
     private Jwt jwt(String subject, String role) {
         Instant issuedAt = Instant.now();
         return Jwt.withTokenValue(role + "-jwt")

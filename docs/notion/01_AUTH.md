@@ -1,8 +1,9 @@
 # CityFarmerPlus 회원·인증 API 명세서
 
-- 기준일: 2026-08-26
-- 기준 소스: 현재 `backend-1` 작업 폴더의 `AuthController`, 인증 DTO, `AuthService`, `AccountWithdrawalService`, Security 및 예외 처리 코드
+- 기준일: 2026-08-27
+- 기준 소스: 통합 코드의 `AuthController`, 인증 DTO, `AuthService`, `AccountWithdrawalService`, Security 및 예외 처리 코드
 - 로컬 Base URL: `http://localhost:8080`
+- 운영 Base URL: `https://cityfarmerplus-api-82951616760.us-west1.run.app`
 - API 수: 7개
 
 > 이 문서는 다른 문서 없이 노션 페이지 하나에 그대로 복사할 수 있는 회원·인증 API 계약이다. 소셜 로그인과 본인인증은 범위에서 제외한다.
@@ -45,12 +46,12 @@ Content-Type: application/json
 |---|---|---|
 | `URBAN_FARMER` | 도시농부 | 가능 |
 | `FARM` | 농가 | 가능 |
-| `CENTER_ADMIN` | backend-2 중개센터 담당자와 공유할 역할 값 | 불가능 |
+| `CENTER_ADMIN` | 중개센터 담당자 | 불가능 |
 
 - 한 계정은 하나의 역할만 가진다.
 - 신규 회원의 `accountStatus`는 `ACTIVE`다.
 - 계정 상태 값은 `ACTIVE`, `SUSPENDED`, `WITHDRAWN`이다.
-- backend-1에는 중개센터 계정 발급 API가 없다.
+- 중개센터 계정은 공개 가입이 아니라 provisioning key가 설정된 동안 `POST /api/internal/center-admins`로 발급한다.
 
 ---
 
@@ -520,4 +521,4 @@ pm.environment.unset("accessToken");
 - Refresh Token
 - 비밀번호 변경·재설정
 - 서버 측 토큰 강제 폐기
-- backend-1의 중개센터 계정 발급 API
+- provisioning key가 비활성화된 운영 상태에서의 중개센터 계정 발급

@@ -1,12 +1,13 @@
 # CityFarmerPlus 전체 API 명세
 
-- 문서 기준일: 2026-08-26
+- 문서 기준일: 2026-08-27
 - 기준: 현재 저장소의 Controller, DTO, Security, Service 상태 검증 코드
-- 현재 HTTP 작업 수: 110개 (사용자·공개·health 68개 + 관리자 42개)
+- 현재 HTTP 작업 수: 111개 (사용자 API 67개 + 관리자 API 42개 + health 2개)
 - 로컬 기본 URL: http://localhost:8080
+- 운영 URL: https://cityfarmerplus-api-82951616760.us-west1.run.app
 - 시간 기준: 별도 표기가 없는 업무 시간 검증은 Asia/Seoul
 
-이 문서는 노션에 그대로 복사할 수 있는 현재 백엔드 통합 계약이다. 사용자 API 상세는 이 문서에, 관리자 API 상세는 `API_SPEC_INDEX.md`가 연결하는 8개 `ADMIN_*_API_SPEC.md`에 기록한다. 구현 예정 기능은 현재 기능처럼 적지 않는다.
+이 문서는 노션과 프론트엔드 연동에 그대로 사용할 수 있는 현재 백엔드 통합 계약이다. 사용자 API 67개, 관리자·내부 발급 API 42개, health 2개를 모두 포함한다. 기능별 상세 예시와 운영 설명은 `API_SPEC_INDEX.md`가 연결하는 개별 문서를 함께 참고하되, 실제 HTTP method/path의 정본은 이 문서다. 구현 예정 기능은 현재 기능처럼 적지 않는다.
 
 ---
 
@@ -45,6 +46,7 @@ Authorization: Bearer {{accessToken}}
 | GET | /api/job-postings |
 | GET | /api/job-postings/{postingId} |
 | GET | /api/support/faqs |
+| GET | /api/market-prices/latest |
 | GET | /health |
 | GET | /health/live |
 | POST | /api/internal/center-admins (provisioning key가 설정된 동안만) |
@@ -92,6 +94,7 @@ page와 size를 직접 받는 API는 기본 page=0, size=20이며 size는 1~100�
 | 400 | INVALID_REQUEST | 읽을 수 없는 JSON |
 | 400 | INVALID_REQUEST_PARAMETER | Enum, 날짜 등 파라미터 형식 오류 |
 | 400 | MISSING_REQUEST_PARAMETER | 필수 Query Parameter 누락 |
+| 400 | MISSING_REQUEST_HEADER | 필수 요청 Header 누락 |
 | 400 | MISSING_MULTIPART_PART | 필수 multipart 파트 누락 |
 | 400 | INVALID_ARGUMENT | 처리 중 발견한 잘못된 요청 값 |
 | 401 | UNAUTHORIZED | JWT 누락, 만료 또는 위조 |
@@ -550,7 +553,7 @@ PENDING_REVIEW 이후 승인·반려·마감·수정·취소와 `JobPostingRevie
 
 ### 8.4 공고 조회
 
-이름은 공개 공고 API이지만 현재 Security 설정상 Bearer JWT가 필요하며 역할 제한은 없다.
+공개 공고 API는 Bearer JWT 없이 호출할 수 있다. 유효한 JWT를 선택적으로 보내면 현재 사용자의 지원 이력이 응답에 추가된다.
 
 | 기능 | Method | URL | 권한 | Query | 성공 |
 |---|---|---|---|---|---|
@@ -689,9 +692,9 @@ workAssignmentId, workSummary, officialPrecautions, preparationChecklist, recomm
 출근 등록 → SCHEDULED / PRESENT
 결근 등록 → NO_SHOW / ABSENT
 출근 근무 완료 → COMPLETED / PRESENT
-backend-2 출결 정정 계약: ABSENT → NO_SHOW
-backend-2 출결 정정 계약: NO_SHOW를 PRESENT로 정정 → SCHEDULED
-backend-2 공고 취소 계약 → CANCELLED
+CENTER_ADMIN 출결 정정 계약: ABSENT → NO_SHOW
+CENTER_ADMIN 출결 정정 계약: NO_SHOW를 PRESENT로 정정 → SCHEDULED
+CENTER_ADMIN 공고 취소 계약 → CANCELLED
 ~~~
 
 해당 공고의 SCHEDULED 배정이 모두 사라지면 CLOSED 공고는 WORK_COMPLETED가 된다. 작업이 끝날 때까지 OPEN으로 남은 공고도 농가의 마지막 근무 완료 처리에서 먼저 CLOSED로 전환한 뒤 WORK_COMPLETED가 된다. 관리자 출결 정정과 정정 이력은 `ADMIN_WORK_ASSIGNMENT_API_SPEC.md`를 따른다.
@@ -739,47 +742,244 @@ id, question, category, answer, officialConfirmationRequired, createdAt
 
 ---
 
-## 13. 주요 전체 흐름과 backend-2 경계
+## 13. 관리자·내부 발급 API — 42개
 
-### 13.1 도시농부
+### 13.1 인증과 집계 기준
+
+- `/api/admin/**` 41개는 `SecurityConfig`와 각 Controller의 `@PreAuthorize("hasRole('CENTER_ADMIN')")`가 모두 `CENTER_ADMIN` JWT를 요구한다.
+- `POST /api/internal/center-admins` 1개는 JWT 없이 호출되지만 `ADMIN_PROVISIONING_KEY`가 설정된 동안만 동작하고 `X-Admin-Provisioning-Key` 헤더가 일치해야 한다. 운영 기본값은 비활성화다.
+- 관리자 JWT도 DB의 계정이 `ACTIVE`이고 토큰 역할과 DB 역할이 일치해야 한다. 서비스 계층은 주요 변경 작업에서 `CENTER_ADMIN` 역할을 다시 확인한다.
+- 이 절의 개수는 내부 발급 1 + 대시보드 1 + 사업참여 4 + 교육 8 + 농가 소유 5 + 공고 9 + 근무 4 + 대리 접수 10 = 42다.
+
+### 13.2 전체 method/path 목록
+
+#### 13.2.1 담당자 발급·대시보드 — 2개
+
+| 기능 | Method | URL | 권한 | 요청 | 성공 |
+|---|---|---|---|---|---|
+| 최초 담당자 발급 | POST | /api/internal/center-admins | 공개 + provisioning key | `X-Admin-Provisioning-Key`, `CenterAdminProvisioningRequest` | 201 `UserResponse` |
+| 관리자 대시보드 | GET | /api/admin/dashboard | CENTER_ADMIN | 없음 | 200 `AdminDashboardResponse` |
+
+#### 13.2.2 사업참여 신청 심사 — 4개
+
+| 기능 | Method | URL | 권한 | 요청 | 성공 |
+|---|---|---|---|---|---|
+| 전체 신청 목록 | GET | /api/admin/participation-applications | CENTER_ADMIN | 없음 | 200 `List<ParticipationApplicationResponse>` |
+| 신청 상세 | GET | /api/admin/participation-applications/{applicationId} | CENTER_ADMIN | 없음 | 200 `ParticipationApplicationResponse` |
+| 신청 승인 | POST | /api/admin/participation-applications/{applicationId}/approve | CENTER_ADMIN | 없음 | 200 `ParticipationApplicationResponse` |
+| 신청 반려 | POST | /api/admin/participation-applications/{applicationId}/reject | CENTER_ADMIN | `ParticipationRejectRequest` | 200 `ParticipationApplicationResponse` |
+
+목록은 생성 시각 내림차순이다. `SUBMITTED` 신청만 승인·반려할 수 있고 반려 `reason`은 공백 불가, 최대 500자다.
+
+#### 13.2.3 교육 과정·이수증 심사 — 8개
+
+| 기능 | Method | URL | 권한 | 요청 | 성공 |
+|---|---|---|---|---|---|
+| 교육 과정 생성 | POST | /api/admin/education/courses | CENTER_ADMIN | `EducationCourseRequest` | 201 `EducationCourseResponse` |
+| 교육 과정 수정 | PATCH | /api/admin/education/courses/{courseId} | CENTER_ADMIN | `EducationCourseRequest` | 200 `EducationCourseResponse` |
+| 교육 과정 비활성화 | POST | /api/admin/education/courses/{courseId}/deactivate | CENTER_ADMIN | 없음 | 200 `EducationCourseResponse` |
+| 심사 대기 제출 목록 | GET | /api/admin/education/submissions | CENTER_ADMIN | `page`, `size`, `sort` | 200 `PageResponse<EducationSubmissionResponse>` |
+| 제출 상세 | GET | /api/admin/education/submissions/{submissionId} | CENTER_ADMIN | 없음 | 200 `EducationSubmissionResponse` |
+| 제출 증빙 다운로드 | GET | /api/admin/education/submissions/{submissionId}/documents/{documentId} | CENTER_ADMIN | 없음 | 200 binary |
+| 제출 승인 | POST | /api/admin/education/submissions/{submissionId}/approve | CENTER_ADMIN | `EducationApproveRequest` | 200 `EducationSubmissionResponse` |
+| 제출 반려 | POST | /api/admin/education/submissions/{submissionId}/reject | CENTER_ADMIN | `EducationRejectRequest` | 200 `EducationSubmissionResponse` |
+
+`EducationCourseRequest`는 `title` 필수·150자 이하, `description` 필수·2000자 이하, `requiredHours` 1 이상, `externalApplicationUrl` 선택·빈 문자열 또는 HTTPS·500자 이하, `mandatory`, `displayOrder` 0 이상을 받는다. 승인 요청의 `recognizedHours`는 1 이상이며 실제로는 해당 과정 필수 시간 이상이고 사용자가 제출한 `completionHours` 이하여야 한다. 반려 `reason`은 공백 불가, 최대 500자다. 승인·반려는 개별 제출과 전체 교육 진행률을 같은 트랜잭션에서 갱신한다.
+
+#### 13.2.4 농가 소유 증빙 심사 — 5개
+
+| 기능 | Method | URL | 권한 | 요청 | 성공 |
+|---|---|---|---|---|---|
+| 상태별 농가 목록 | GET | /api/admin/farm-profiles | CENTER_ADMIN | 필수 `status` | 200 `List<FarmProfileResponse>` |
+| 최신 소유 제출 상세 | GET | /api/admin/farm-profiles/{profileId} | CENTER_ADMIN | 없음 | 200 `FarmOwnershipSubmissionResponse` |
+| 소유 증빙 다운로드 | GET | /api/admin/farm-profiles/{profileId}/ownership/documents/{documentId} | CENTER_ADMIN | 없음 | 200 binary |
+| 소유 증빙 승인 | POST | /api/admin/farm-profiles/{profileId}/ownership/approve | CENTER_ADMIN | 없음 | 200 `FarmOwnershipSubmissionResponse` |
+| 소유 증빙 반려 | POST | /api/admin/farm-profiles/{profileId}/ownership/reject | CENTER_ADMIN | `FarmOwnershipRejectRequest` | 200 `FarmOwnershipSubmissionResponse` |
+
+`status`는 `DRAFT`, `PENDING_REVIEW`, `APPROVED`, `REJECTED`, `INACTIVE` 중 하나다. 최신 제출과 프로필이 모두 심사 대기인 경우에만 승인·반려하며 두 상태와 심사자·심사 시각을 같은 트랜잭션으로 갱신한다. 반려 `reason`은 공백 불가, 최대 1000자다.
+
+#### 13.2.5 공고 심사·수정·매칭 — 9개
+
+| 기능 | Method | URL | 권한 | 요청 | 성공 |
+|---|---|---|---|---|---|
+| 심사 대기 공고 목록 | GET | /api/admin/job-postings | CENTER_ADMIN | `page`, `size`, `sort` | 200 `PageResponse<JobPostingResponse>` |
+| 공고 승인 | POST | /api/admin/job-postings/{postingId}/approve | CENTER_ADMIN | 없음 | 200 `JobPostingReviewResponse` |
+| 공고 반려 | POST | /api/admin/job-postings/{postingId}/reject | CENTER_ADMIN | `JobPostingRejectRequest` | 200 `JobPostingReviewResponse` |
+| 공고 수정 | PATCH | /api/admin/job-postings/{postingId} | CENTER_ADMIN | `AdminJobPostingUpdateRequest` | 200 `JobPostingResponse` |
+| 공고 강제 마감 | POST | /api/admin/job-postings/{postingId}/close | CENTER_ADMIN | 없음 | 200 `JobPostingReviewResponse` |
+| 공고 취소 | POST | /api/admin/job-postings/{postingId}/cancel | CENTER_ADMIN | 없음 | 200 `JobPostingReviewResponse` |
+| 공고 심사 이력 | GET | /api/admin/job-postings/{postingId}/review-history | CENTER_ADMIN | 없음 | 200 `List<JobPostingReviewResponse>` |
+| 지원 후보 목록 | GET | /api/admin/job-postings/{postingId}/candidates | CENTER_ADMIN | 없음 | 200 `List<JobCandidateResponse>` |
+| 지원자 배치 매칭 | POST | /api/admin/job-postings/{postingId}/matches | CENTER_ADMIN | `JobPostingMatchRequest` | 200 `List<WorkAssignmentResponse>` |
+
+승인은 `PENDING_REVIEW → OPEN`, 반려는 `PENDING_REVIEW → DRAFT`이며 반려 사실은 `JobPostingReview(action=REJECTED)`로 남는다. 반려 `reason`은 최대 1000자다. 관리자 수정은 `reason`과 8.2절의 공고 전체 필드를 받고, 이미 확정된 근무자가 있는 공고의 근무 조건은 수정할 수 없다. 마감은 남은 `APPLIED` 지원을 `NOT_MATCHED`로 바꾸고, 취소는 지원과 아직 예정인 근무도 취소한다.
+
+`JobPostingMatchRequest.applicationIds`는 양수 ID 1~100개이며 중복을 허용하지 않는다. `OPEN` 공고의 `APPLIED` 지원만 매칭할 수 있고 정원 초과와 동일 시간대 중복 근무를 거절한다. 매칭은 지원을 `MATCHED`로 바꾸고 `WorkAssignment`를 생성한다. 정원을 채우면 공고를 `CLOSED`로 바꾸고 남은 `APPLIED` 지원은 `NOT_MATCHED`가 된다.
+
+#### 13.2.6 근무 조회·출결 정정 — 4개
+
+| 기능 | Method | URL | 권한 | 요청 | 성공 |
+|---|---|---|---|---|---|
+| 전체 근무 목록 | GET | /api/admin/work-assignments | CENTER_ADMIN | 선택 `status`, `page`, `size`, `sort` | 200 `PageResponse<WorkAssignmentResponse>` |
+| 근무 상세 | GET | /api/admin/work-assignments/{assignmentId} | CENTER_ADMIN | 없음 | 200 `WorkAssignmentResponse` |
+| 출결 정정 | POST | /api/admin/work-assignments/{assignmentId}/attendance-correction | CENTER_ADMIN | `AttendanceCorrectionRequest` | 200 `WorkAssignmentCorrectionResponse` |
+| 정정 이력 | GET | /api/admin/work-assignments/{assignmentId}/correction-history | CENTER_ADMIN | 없음 | 200 `List<WorkAssignmentCorrectionResponse>` |
+
+목록 `status`는 `SCHEDULED`, `COMPLETED`, `NO_SHOW`, `CANCELLED` 중 하나다. 정정 요청은 `status=PRESENT|ABSENT`와 공백이 아닌 `reason` 최대 1000자를 받는다. 최초 출결이 `NOT_RECORDED`인 배정은 관리자 정정 대상이 아니다. 정정으로 종결 배정이 다시 `SCHEDULED`가 되면 필요할 때 `WORK_COMPLETED` 공고도 다시 열린다.
+
+#### 13.2.7 대리 접수 — 10개
+
+| 기능 | Method | URL | 권한 | 요청 | 성공 |
+|---|---|---|---|---|---|
+| 도시농부 계정 생성 | POST | /api/admin/proxy/urban-farmers | CENTER_ADMIN | `ProxyAccountRequest` | 201 `UserResponse` |
+| 도시농부 프로필 등록 | POST | /api/admin/proxy/urban-farmers/{userId}/profile | CENTER_ADMIN | `ProxyUrbanFarmerProfileRequest` | 201 `UrbanFarmerProfileResponse` |
+| 희망 근무 조건 등록·수정 | PUT | /api/admin/proxy/urban-farmers/{userId}/work-preference | CENTER_ADMIN | `ProxyWorkPreferenceRequest` | 200 `WorkPreferenceResponse` |
+| 사업참여 초안 생성 | POST | /api/admin/proxy/urban-farmers/{userId}/participation-applications | CENTER_ADMIN | `ProxyParticipationApplicationRequest` | 201 `ParticipationApplicationResponse` |
+| 사업참여 제출 | POST | /api/admin/proxy/urban-farmers/{userId}/participation-applications/{applicationId}/submit | CENTER_ADMIN | `ProxyParticipationSubmitRequest` | 200 `ParticipationApplicationResponse` |
+| 교육 이수증 대리 제출 | POST | /api/admin/proxy/urban-farmers/{userId}/education-submissions | CENTER_ADMIN | multipart `request`, `documents` | 201 `EducationSubmissionResponse` |
+| 농가 계정 생성 | POST | /api/admin/proxy/farms | CENTER_ADMIN | `ProxyAccountRequest` | 201 `UserResponse` |
+| 농가 프로필 등록 | POST | /api/admin/proxy/farms/{userId}/profile | CENTER_ADMIN | `ProxyFarmProfileRequest` | 201 `FarmProfileResponse` |
+| 농가 소유 증빙 대리 제출 | POST | /api/admin/proxy/farms/{userId}/ownership-submissions | CENTER_ADMIN | multipart `request`, `documents` | 201 `FarmOwnershipSubmissionResponse` |
+| 농가 공고 초안 생성 | POST | /api/admin/proxy/farms/{userId}/job-postings | CENTER_ADMIN | `submitForReview=false`, `ProxyJobPostingDraftRequest` | 201 `JobPostingResponse` |
+
+모든 대리 요청은 공백이 아닌 `reason` 최대 1000자를 받고 append-only 감사 로그를 남긴다. `ProxyAccountRequest`는 일반 계정 필드와 동일하게 아이디 4~30자, 비밀번호 8~64자·UTF-8 72바이트 이하, 이름 50자 이하를 검증하며 URL에 따라 역할을 `URBAN_FARMER` 또는 `FARM`으로 고정한다. 대리 프로필·희망 조건·사업참여·공고 입력은 각 사용자 요청과 같은 필드 제한을 적용한다.
+
+교육 대리 제출의 `request`는 `courseId`, 미래가 아닌 `completionDate`, `completionHours` 8~1000, `reason`이며 `documents`는 7절의 파일 제한을 따른다. 농가 소유 대리 제출의 `request`는 `reason`, `documents`는 같은 소유 증빙 제한을 따른다. 농가 공고는 `submitForReview=true`일 때 생성 트랜잭션 안에서 바로 심사 대기 상태로 전환한다.
+
+### 13.3 대표 요청 DTO
+
+| DTO | 핵심 필드·검증 |
+|---|---|
+| `CenterAdminProvisioningRequest` | `loginId`, `password`, `name`; 공개 회원가입과 동일한 아이디·비밀번호·이름 제한 |
+| `ParticipationRejectRequest` | `reason` 필수, 500자 이하 |
+| `EducationCourseRequest` | `title`, `description`, `requiredHours`, `externalApplicationUrl`, `mandatory`, `displayOrder` |
+| `EducationApproveRequest` | `recognizedHours` 필수, 1 이상; 서비스에서 과정 필수시간·제출시간 범위 재검증 |
+| `EducationRejectRequest` | `reason` 필수, 500자 이하 |
+| `FarmOwnershipRejectRequest` | `reason` 필수, 1000자 이하 |
+| `JobPostingRejectRequest` | `reason` 필수, 1000자 이하 |
+| `AdminJobPostingUpdateRequest` | `reason` + 8.2절 공고 전체 입력; 작업일은 오늘 또는 미래이고 시작 시각은 현재 이후, 시간·정원·금액·본문 제한 적용 |
+| `JobPostingMatchRequest` | `applicationIds` 1~100개, 각 ID 양수·null 불가·중복 불가 |
+| `AttendanceCorrectionRequest` | `status` 필수, `reason` 필수·1000자 이하 |
+| `Proxy*Request` | 해당 사용자 DTO 필드 + 감사용 `reason` 필수·1000자 이하 |
+
+### 13.4 대표 응답 DTO
+
+기존 사용자 DTO를 반환하는 관리자 API는 같은 JSON 계약을 재사용한다.
+
+| DTO | 핵심 필드 또는 참조 |
+|---|---|
+| `UserResponse` | 2.2절의 회원 필드. 비밀번호는 반환하지 않음 |
+| `ParticipationApplicationResponse` | 4.1절의 신청·상태·심사자·version 필드 |
+| `EducationCourseResponse` | 5.1절의 과정 필드 + `id`, `active`, `version`, 생성·수정 시각 |
+| `EducationSubmissionResponse` | 5.2절의 제출·과정·심사·증빙·version 필드 |
+| `FarmProfileResponse` | 6.1절의 농가 정보·상태·심사 필드 |
+| `FarmOwnershipSubmissionResponse` | 6.2절의 제출 회차·스냅샷·증빙·심사 필드 |
+| `JobPostingResponse` | 8.2~8.3절의 공고 전체 필드·상태·최근 심사 필드 |
+| `WorkAssignmentResponse` | 10.1절의 근무·공고·농가·담당자·출결 스냅샷 필드 |
+
+관리자 고유 응답:
+
+| DTO | 필드 |
+|---|---|
+| `AdminDashboardResponse` | `submittedParticipationApplications`, `pendingEducationSubmissions`, `pendingFarmOwnershipSubmissions`, `pendingJobPostings`, `openJobPostings`, `pendingJobApplications`, `scheduledWorkAssignments`, `completedWorkAssignments`, `activeUrbanFarmerCount`, `activeFarmCount`, `activeCenterAdminCount` |
+| `JobPostingReviewResponse` | `id`, `reviewerUserId`, `reviewerName`, `action`, `reason`, `titleSnapshot`, `descriptionSnapshot`, `createdAt` |
+| `JobCandidateResponse` | `applicationId`, `urbanFarmerUserId`, `name`, `phoneNumber`, `status`, `farmOpinion`, `farmOpinionNote`, 희망 지역·요일·기간·작업·이동 가능 여부 스냅샷, `experienceCountSnapshot`, `educationVerifiedAt`, `appliedAt` |
+| `WorkAssignmentCorrectionResponse` | `id`, `workAssignmentId`, 정정 전·후 근무 상태와 출결 상태, `correctedByUserId`, `correctedByName`, `reason`, `correctedAt` |
+
+파일 다운로드 성공 응답은 JSON이 아니라 저장된 파일 바이트이며 `Content-Type`, `Content-Length`, UTF-8 파일명의 `Content-Disposition: attachment`를 반환한다.
+
+### 13.5 주요 관리자 오류
+
+1.4절 공통 오류가 모든 관리자 API에 적용된다. 아래는 관리자 도메인에서 추가로 중요한 코드다.
+
+| HTTP | 코드 | 주요 발생 조건 |
+|---:|---|---|
+| 400 | `VALIDATION_ERROR` | 요청 DTO 필드 제한 위반 |
+| 400 | `INVALID_REQUEST_PARAMETER` | status 등 Enum·ID 형식 오류 |
+| 400 | `MISSING_REQUEST_HEADER` | provisioning key 헤더 누락 |
+| 400 | `INVALID_RECOGNIZED_HOURS` | 교육 인정 시간이 과정·제출 범위를 위반 |
+| 401 | `UNAUTHORIZED` | 관리자 JWT 누락·만료·위조 |
+| 401 | `INVALID_PROVISIONING_KEY` | 내부 담당자 발급 키 불일치 |
+| 403 | `ACCESS_DENIED` | CENTER_ADMIN이 아닌 JWT로 `/api/admin/**` 호출 |
+| 403 | `INACTIVE_ACCOUNT` | 서비스 재검증 시 담당자 계정이 비활성 |
+| 403 | `CENTER_ADMIN_ROLE_REQUIRED` | 서비스 재검증 시 담당자 역할 불일치 |
+| 403 | `PROVISIONING_DISABLED` | 내부 담당자 발급 기능 비활성 |
+| 404 | `USER_NOT_FOUND` | 담당자 또는 대리 처리 대상 사용자 없음 |
+| 404 | `PARTICIPATION_APPLICATION_NOT_FOUND` | 사업참여 신청 없음 |
+| 404 | `EDUCATION_COURSE_NOT_FOUND` | 교육 과정 없음 |
+| 404 | `EDUCATION_SUBMISSION_NOT_FOUND` | 교육 제출 없음 |
+| 404 | `EDUCATION_DOCUMENT_NOT_FOUND` | 제출과 증빙 문서 관계가 일치하지 않음 |
+| 404 | `FARM_PROFILE_NOT_FOUND` | 농가 프로필 없음 |
+| 404 | `OWNERSHIP_SUBMISSION_NOT_FOUND` | 농가 소유 제출 없음 |
+| 404 | `OWNERSHIP_DOCUMENT_NOT_FOUND` | 농가 소유 증빙 없음 |
+| 404 | `JOB_POSTING_NOT_FOUND` | 공고 없음 |
+| 404 | `JOB_APPLICATION_NOT_FOUND` | 매칭 요청 지원이 없거나 다른 공고 소속 |
+| 404 | `WORK_ASSIGNMENT_NOT_FOUND` | 근무 배정 없음 |
+| 409 | `DUPLICATE_LOGIN_ID` | 담당자·대리 계정 아이디 중복 |
+| 409 | `INVALID_PARTICIPATION_STATUS` | `SUBMITTED`가 아닌 신청 승인·반려 |
+| 409 | `INVALID_EDUCATION_SUBMISSION_STATUS` | `PENDING_REVIEW`가 아닌 교육 제출 심사 |
+| 409 | `OWNERSHIP_REVIEW_NOT_ALLOWED` | 최신 심사 대기 소유 제출이 아님 |
+| 409 | `INVALID_JOB_POSTING_STATE` | 현재 공고 상태에서 승인·반려·마감·취소·매칭 불가 |
+| 409 | `MATCHED_POSTING_UPDATE_NOT_ALLOWED` | 확정 근무자가 있는 공고 수정 |
+| 409 | `CAPACITY_BELOW_MATCHED_COUNT` | 확정 인원보다 작은 정원으로 수정 |
+| 409 | `INVALID_JOB_APPLICATION_STATE` | 중복 ID 또는 `APPLIED`가 아닌 지원 매칭 |
+| 409 | `JOB_POSTING_CAPACITY_EXCEEDED` | 매칭 후 정원 초과 |
+| 409 | `OVERLAPPING_WORK_ASSIGNMENT` | 같은 사용자의 확정 근무 시간 중복 |
+| 409 | `INVALID_WORK_ASSIGNMENT_STATE` | 최초 출결 전 정정 또는 허용하지 않는 정정 |
+| 410 | `EDUCATION_DOCUMENT_FILE_UNAVAILABLE` | 교육 증빙 메타데이터는 있으나 저장 파일을 읽을 수 없음 |
+| 500 | `OWNERSHIP_DOCUMENT_READ_ERROR` | 농가 증빙 메타데이터는 있으나 파일 읽기 실패 |
+
+관리자 상세 예시와 도메인별 전체 오류 표는 `API_SPEC_INDEX.md`가 연결하는 `ADMIN_*_API_SPEC.md`를 참고한다. 이 통합본과 개별 문서가 충돌하면 현재 Controller·DTO·Security·Exception 코드와 이 통합본의 method/path를 우선한다.
+
+---
+
+## 14. 주요 전체 흐름과 중개센터 역할 경계
+
+### 14.1 도시농부
 
 ~~~text
 URBAN_FARMER 회원가입·로그인
 → 기본 회원 정보 수정
 → 개별 API로 프로필·희망 근무 조건·사업참여 신청을 작성하거나 통합 신청 폼으로 한 번에 저장·제출
 → 활성 필수 교육 과정별 이수증 제출
-→ backend-2 심사로 모든 필수 교육이 APPROVED가 된 뒤
-→ backend-2가 OPEN으로 승인한 모집 공고 조회·지원
+→ CENTER_ADMIN 심사로 모든 필수 교육이 APPROVED가 된 뒤
+→ CENTER_ADMIN이 OPEN으로 승인한 모집 공고 조회·지원
 → 농가 선호 의견 확인 대상
-→ backend-2 최종 매칭
+→ CENTER_ADMIN 최종 매칭
 → 확정 근무·담당자 연락처·작업 안내 조회
 → 농가 출결 및 근무 완료 처리
 ~~~
 
-### 13.2 농가
+### 14.2 농가
 
 ~~~text
 FARM 회원가입·로그인
 → 농가 프로필 작성
 → 소유 증빙 제출
-→ backend-2 심사로 APPROVED
+→ CENTER_ADMIN 심사로 APPROVED
 → AI 규칙 기반 공고 문구 미리보기
 → 공고 초안 생성·수정
 → 공고 심사 요청
-→ backend-2가 수정·승인하여 OPEN
+→ CENTER_ADMIN이 수정·승인하여 OPEN
 → 지원자 선호 의견 등록
-→ backend-2 최종 매칭
+→ CENTER_ADMIN 최종 매칭
 → 출결 등록
 → 작업 종료 후 근무 완료 확정
 ~~~
 
-### 13.3 관리자 업무
+### 14.3 관리자 업무
 
-통합 백엔드는 `/api/admin/**`에서 사업참여·교육·농가 소유 증빙 심사, 교육 과정 관리, 공고 심사·최종 매칭, 근무 정정, 대리 접수와 대시보드를 제공한다. 관리자 API 42개의 URL·입력·오류·상태 전이는 `API_SPEC_INDEX.md`의 8개 관리자 전용 명세를 기준으로 한다. 내부 담당자 발급 경로는 운영 기본 비활성이고 일반 회원가입과 분리된다.
+통합 백엔드는 `/api/admin/**`에서 사업참여·교육·농가 소유 증빙 심사, 교육 과정 관리, 공고 심사·최종 매칭, 근무 정정, 대리 접수와 대시보드를 제공한다. 관리자·내부 발급 API 42개의 method/path와 공통 계약은 13장이 정본이며, 기능별 상세 예시는 `API_SPEC_INDEX.md`의 관리자 전용 명세를 함께 참고한다. 내부 담당자 발급 경로는 운영 기본 비활성이고 일반 회원가입과 분리된다.
+
+### 14.4 KAMIS 최근 조사 가격
+
+`GET /api/market-prices/latest`는 인증 없이 KAMIS의 최근 조사 가격을 조회한다. `marketType=RETAIL|WHOLESALE`, 선택 `categoryCode=100|200|300|400|500|600`, 선택 `keyword`, `page`, `size`를 받는다. 응답에는 `provider`, `description`, `observedDate`, `fetchedAt`, `stale`, 페이지 정보와 가격 목록이 포함된다.
+
+KAMIS 데이터는 실시간 체결가나 농가 실수취가가 아니라 최근 조사일 기준 도·소매 조사 가격이다. 서버는 성공 응답을 1시간 캐시하며 KAMIS 일시 장애 때 24시간 이내의 마지막 성공값을 `stale=true`로 반환한다. 상세 계약은 `MARKET_PRICE_API_SPEC.md`를 따른다.
 
 ---
 
-## 14. 확정 제외 및 현재 미구현
+## 15. 확정 제외 및 현재 미구현
 
 다음은 사용자 최종 결정에 따라 현재 백엔드 범위에서 제외한다.
 
@@ -795,7 +995,6 @@ FARM 회원가입·로그인
 현재 코드에 없는 기능:
 
 - 지도 좌표·지도 URL·지도 공급자 연동
-- 농산물 시세 외부 데이터 연동
 - 실제 LLM 공급자 호출
 - JWT refresh token, 서버 토큰 블랙리스트
 - 비밀번호 찾기·재설정
@@ -805,11 +1004,11 @@ FARM 회원가입·로그인
 
 ---
 
-## 15. Postman 권장 변수
+## 16. Postman 권장 변수
 
 | 변수 | 의미 |
 |---|---|
-| baseUrl | http://localhost:8080 |
+| baseUrl | 운영 `https://cityfarmerplus-api-82951616760.us-west1.run.app` 또는 로컬 `http://localhost:8080` |
 | accessToken | 현재 로그인 JWT |
 | urbanFarmerAccessToken | 도시농부 JWT |
 | farmAccessToken | 농가 JWT |

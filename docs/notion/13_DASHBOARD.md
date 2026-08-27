@@ -1,8 +1,9 @@
 # 홈 대시보드 API
 
 - 기준일: 2026-08-20
-- 기준: 현재 `backend-1` 코드
+- 기준: 현재 `main` 통합 코드
 - 로컬 Base URL: `http://localhost:8080`
+- 운영 Base URL: `https://cityfarmerplus-api-82951616760.us-west1.run.app`
 - API 수: 2개
 
 ## 개요
@@ -288,16 +289,16 @@ JWT: `Authorization: Bearer {accessToken}`
 
 ```bash
 # 도시농부 홈
-curl "http://localhost:8080/api/urban-farmers/me/home" \
+curl "{{baseUrl}}/api/urban-farmers/me/home" \
   -H "Authorization: Bearer {{urbanFarmerAccessToken}}"
 
 # 농가 홈
-curl "http://localhost:8080/api/farm/me/home" \
+curl "{{baseUrl}}/api/farm/me/home" \
   -H "Authorization: Bearer {{farmAccessToken}}"
 ```
 
-## 현재 제한과 `backend-2` 경계
+## 현재 제한과 중개센터 역할 경계
 
 - 대시보드는 매칭·승인·반려·마감을 처리하지 않고 현재 DB 결과를 조회만 한다.
-- 농가/공고 승인, 지원자 매칭은 `backend-2` 중개센터가 담당한다.
+- 농가·공고 승인과 지원자 매칭은 현재 통합된 `CENTER_ADMIN` 중개센터 API가 처리한다.
 - 대시보드의 `recentOpenPostings`는 공개 공고 응답과 같이 농가 전체 주소/연락처를 숨긴다. 매칭 후 `upcomingWork`에서는 현장 연락을 위해 해당 정보가 노출된다.

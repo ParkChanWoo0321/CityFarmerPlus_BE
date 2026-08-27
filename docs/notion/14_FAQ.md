@@ -1,8 +1,9 @@
 # 자주 묻는 질문(FAQ) API
 
 - 기준일: 2026-08-20
-- 기준: 현재 `backend-1` 코드
+- 기준: 현재 `main` 통합 코드
 - 로컬 Base URL: `http://localhost:8080`
+- 운영 Base URL: `https://cityfarmerplus-api-82951616760.us-west1.run.app`
 - API 수: 1개
 
 ## 개요
@@ -93,20 +94,20 @@
 ## Postman 예시
 
 ```bash
-curl "http://localhost:8080/api/support/faqs"
+curl "{{baseUrl}}/api/support/faqs"
 ```
 
 Postman:
 
 1. Method `GET`
-2. URL `http://localhost:8080/api/support/faqs`
+2. URL `{{baseUrl}}/api/support/faqs`
 3. Authorization → `No Auth`
 4. Body 없음
 
-## 현재 제한과 `backend-2` 경계
+## 현재 제한과 중개센터 역할 경계
 
 - FAQ 내용은 코드 배포 없이 수정할 수 없다.
 - 카테고리 필터, 검색, 페이징이 없다.
-- FAQ의 “담당자”는 농가/공고/교육 승인과 매칭을 담당하는 `backend-2` 중개센터 기능을 뜻한다.
+- FAQ의 “담당자”는 농가·공고·교육 승인과 매칭을 처리하는 현재 통합 `CENTER_ADMIN` 중개센터 기능을 뜻한다.
 - 이 API 자체에는 중개센터 전용 작업이 없다.
 - FAQ 등록·수정·삭제 API는 현재 제공하지 않는다.

@@ -1,8 +1,9 @@
 # 농가 모집 공고 관리 API
 
 - 기준일: 2026-08-20
-- 기준: 현재 `backend-1` 코드
+- 기준: 현재 `main` 통합 코드
 - 로컬 Base URL: `http://localhost:8080`
+- 운영 Base URL: `https://cityfarmerplus-api-82951616760.us-west1.run.app`
 - API 수: 10개
 
 > 현재 `FarmJobPostingController`, `FarmJobPostingService`, 공고 DTO/엔티티/예외 구현을 기준으로 작성한 복사용 명세서다.
@@ -40,7 +41,7 @@
 | 값 | 의미 |
 |---|---|
 | `DRAFT` | 농가가 수정·삭제할 수 있는 초안 |
-| `PENDING_REVIEW` | `backend-2` 중개센터의 심사 대기 |
+| `PENDING_REVIEW` | `CENTER_ADMIN` 중개센터의 심사 대기 |
 | `OPEN` | 승인되어 지원 가능한 모집 중 공고 |
 | `CLOSED` | 매칭 인원 충족 등으로 마감 |
 | `CANCELLED` | 취소 |
@@ -651,13 +652,13 @@ curl -X PATCH "{{baseUrl}}/api/farm/job-postings/101/applicant-preference" \
   -d '{"applicantPreference":"초보자도 가능합니다."}'
 ```
 
-## 중개센터(`backend-2`) 경계와 현재 제한
+## 중개센터 담당자 API와 현재 제한
 
 - 이 문서에는 관리자/중개센터 전용 API를 기재하지 않았다.
-- `PENDING_REVIEW` 공고의 승인·반려·담당자 수정·강제 마감은 `backend-2`가 담당한다.
+- `PENDING_REVIEW` 공고의 승인·반려와 담당자 수정·강제 마감은 현재 통합된 `CENTER_ADMIN` API가 처리한다.
 - DB 상태가 아직 `OPEN`이어도 작업 시작 시각이 지났다면 농가 화면에서는 `CLOSED`로 분류된다. 따라서 `APPROVED` 탭과 홈 승인 건수에는 포함되지 않고 `CLOSED` 탭과 마감 건수에 포함된다.
 - 승인된 공고의 전체 내용을 농가가 직접 수정하는 API는 없다. 작업 시작 전 `OPEN` 공고에서 농가가 직접 수정할 수 있는 값은 `applicantPreference`다.
-- 지원자 수락/거절에 해당하는 최종 매칭은 `backend-2`가 확정한다. 농가는 의견만 남길 수 있다.
-- 모집 인원 충족 시 자동 마감하는 도메인 규칙은 있지만, 이 모듈에 매칭 API가 없으므로 실제 호출 지점은 `backend-2` 통합에서 연결해야 한다.
+- 지원자 수락/거절에 해당하는 최종 매칭은 `CENTER_ADMIN`이 확정한다. 농가는 의견만 남길 수 있다.
+- `POST /api/admin/job-postings/{postingId}/matches`가 최종 매칭을 확정하며 모집 인원이 충족되면 공고를 자동으로 마감한다.
 - 지원자가 있는 공고도 확정/완료 매칭만 없다면 농가가 취소할 수 있다. 이때 대기 지원은 자동으로 공고 취소 상태가 된다.
-- 공고 심사 이력은 `backend-2`가 생성한 결과를 농가가 조회하는 용도다.
+- 공고 심사 이력은 `CENTER_ADMIN` API가 생성한 결과를 농가가 조회하는 용도다.

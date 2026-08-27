@@ -2,9 +2,11 @@
 
 - 문서 버전: 2.0
 - 갱신일: 2026-08-20
-- 구현 기준 브랜치: `backend-1`
+- 구현 기준: 현재 `main` 통합 코드
 - 적용 범위: 제출, 반려 후 재제출 이력, 본인 목록·상세·파일 다운로드
 - 관련 문서: `FARM_PROFILE_API_SPEC.md`, `API_SPEC_INDEX.md`
+- 운영 Base URL: `https://cityfarmerplus-api-82951616760.us-west1.run.app`
+- 로컬 Base URL: `http://localhost:8080`
 
 ## 1. 핵심 규칙
 
@@ -13,12 +15,12 @@
 - 농가 프로필이 `DRAFT` 또는 `REJECTED`일 때만 제출할 수 있다.
 - 제출이 완료되면 농가 프로필은 `PENDING_REVIEW`로 변경된다.
 - 한 번 제출된 회차와 파일 메타데이터는 수정하거나 덮어쓰지 않는다.
-- backend-2 심사로 프로필이 `REJECTED`가 되면 같은 API가 기존 회차를 보존하고 `attemptNumber`를 1 증가시킨다.
+- 중개센터 심사로 프로필이 `REJECTED`가 되면 같은 API가 기존 회차를 보존하고 `attemptNumber`를 1 증가시킨다.
 - `PENDING_REVIEW`, `APPROVED`, `INACTIVE` 상태에서는 새 제출을 허용하지 않는다.
 - 본인 제출 이력·상세·파일 다운로드와 회원 탈퇴 후 파일 삭제 작업 등록이 구현되어 있다.
-- `CENTER_ADMIN`, 심사자 필드, 승인·반려 상태는 backend-2 병합용 공통 계약이며 backend-1에는 담당자 처리·다운로드 API가 없다.
+- `CENTER_ADMIN`은 담당자용 제출 조회·파일 다운로드·승인·반려 API를 사용할 수 있다. 상세 계약은 `ADMIN_FARM_OWNERSHIP_API_SPEC.md`를 따른다.
 
-backend-1 단독으로는 `REJECTED` 상태를 만들 수 없다. 다만 backend-2 심사 결과가 저장되면 backend-1의 동일 제출 API로 새 회차를 만들 수 있다.
+통합된 중개센터 심사 API로 `REJECTED` 상태를 만든 뒤 농가가 동일 제출 API를 호출하면 새 회차를 만들 수 있다.
 
 ## 2. API
 
@@ -107,7 +109,7 @@ REJECTED ── 재제출(attempt N+1) ──> PENDING_REVIEW
 
 동일 농가의 두 요청이 동시에 제출 회차를 만들지 못하도록 농가 프로필 행을 비관적 쓰기 잠금으로 조회한다. DB에도 `(farm_profile_id, attempt_number)` UNIQUE 제약을 두어 중복 회차를 이중 방어한다.
 
-backend-2가 심사할 때 최신 `PENDING_REVIEW` 회차와 농가 프로필 상태를 함께 변경한다. 반려된 회차와 파일은 그대로 남기고, 재제출은 별도의 새 회차로 저장한다.
+중개센터가 심사할 때 최신 `PENDING_REVIEW` 회차와 농가 프로필 상태를 함께 변경한다. 반려된 회차와 파일은 그대로 남기고, 재제출은 별도의 새 회차로 저장한다.
 
 ## 6. 오류 응답
 
@@ -228,17 +230,16 @@ farm-ownership/{farmProfileId}/{requestBatchUuid}/{storedFileUuid}.{extension}
 9. 허용되지 않은 확장자로 `415 UNSUPPORTED_OWNERSHIP_DOCUMENT_TYPE`인지 확인한다.
 10. 도시농부 토큰으로 호출해 `403 ACCESS_DENIED`인지 확인한다.
 
-반려와 재제출 전체 흐름은 backend-2 심사 API가 병합된 뒤 통합 검증한다.
+반려와 재제출 전체 흐름은 통합된 중개센터 심사 API와 함께 검증한다.
 
 ## 11. 로컬 MySQL 통합 테스트
 
-일반 `gradlew test`에서는 개발 DB에 예기치 않게 접근하지 않도록 MySQL 통합 테스트를 건너뛴다. 새 테이블 매핑, 문서 cascade 저장, 비관적 잠금 쿼리, 제출 회차 UNIQUE 제약을 로컬 MySQL로 확인할 때만 명시적으로 활성화한다.
+일반 `gradlew test`는 격리된 H2(MySQL 호환 모드)에서 새 테이블 매핑, 문서 cascade 저장, 비관적 잠금 쿼리와 제출 회차 UNIQUE 제약을 자동 검증하며 별도 환경변수가 필요하지 않다.
 
 PowerShell 실행 예시:
 
 ```powershell
-$env:RUN_MYSQL_INTEGRATION_TESTS='true'
 .\gradlew.bat test --tests "chungbuk.cityfarmerplus.farm.ownership.repository.FarmOwnershipPersistenceIntegrationTest" --no-daemon
 ```
 
-DB와 JWT 설정은 로컬 `.env`를 사용한다. 테스트 데이터 행은 트랜잭션으로 롤백되지만 Hibernate `ddl-auto=update`의 스키마 변경과 MySQL AUTO_INCREMENT 증가는 롤백되지 않으므로 개발용 DB에서만 실행한다.
+테스트 DB와 JWT 설정은 `src/test/resources/application-test.properties`의 테스트 전용 값만 사용한다. 테스트 데이터는 트랜잭션으로 롤백되고 개발·운영 MySQL에는 연결하지 않는다.

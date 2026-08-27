@@ -39,8 +39,40 @@ dependencies {
     implementation 'com.nimbusds:nimbus-jose-jwt'
     implementation 'org.springframework.boot:spring-boot-starter-webclient'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'com.h2database:h2'
 }
 
 tasks.named('test') {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags 'mysql-integration'
+    }
+}
+
+tasks.register('mysqlIntegrationTest', Test) {
+    description = 'Runs opt-in persistence contracts against a dedicated MySQL database.'
+    group = 'verification'
+
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+
+    useJUnitPlatform {
+        includeTags 'mysql-integration'
+    }
+
+    shouldRunAfter tasks.named('test')
+
+    doFirst {
+        def requiredVariables = ['DB_URL', 'DB_USERNAME', 'DB_PASSWORD']
+        def missingVariables = requiredVariables.findAll { variableName ->
+            !System.getenv(variableName)?.trim()
+        }
+
+        if (!missingVariables.isEmpty()) {
+            throw new GradleException(
+                    "mysqlIntegrationTest requires non-blank DB_URL, DB_USERNAME, and DB_PASSWORD " +
+                            "environment variables. Missing: ${missingVariables.join(', ')}. " +
+                            'Use a cloned or dedicated MySQL test database; never run this task against production.'
+            )
+        }
+    }
 }

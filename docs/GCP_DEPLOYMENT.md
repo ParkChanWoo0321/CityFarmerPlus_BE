@@ -37,7 +37,7 @@ GCP 무료 한도를 사용하려면 활성 결제 계정이 필요하다. 결�
 - Cloud Storage bucket은 Always Free 대상인 `us-west1`에 만든다. Standard Storage 무료 한도는 월 5 GiB이며 세 개의 미국 무료 리전 사용량을 합산한다.
 - Cloud Build는 무료 대상인 기본 풀 `e2-standard-2`를 사용한다. 결제 계정당 월 2,500 build-minutes까지 무료다.
 - Artifact Registry에는 전용 repository 정리 정책을 적용해 최근 이미지 한 개만 남긴다. 무료 저장공간은 결제 계정당 0.5 GiB다.
-- Secret Manager는 DB/JWT/KAMIS용 다섯 개의 활성 secret version만 유지한다. 무료 한도는 활성 version 6개와 월 10,000회 access다.
+- Secret Manager는 DB/JWT/KAMIS용 여섯 개의 기본 활성 secret version을 유지한다. 무료 한도는 활성 version 6개와 월 10,000회 access이므로 회전 중 추가된 구 version은 검증 후 비활성화하고, 즉시 삭제하지 않아 롤백 여지는 남긴다.
 - Cloud Scheduler의 `cityfarmerplus-db-keepalive` 작업 하나가 매시간 `/health`를 호출한다. 결제 계정당 월 3개 작업까지 무료이며 실행 횟수별 Scheduler 요금은 없지만, 호출로 발생하는 Cloud Run 사용량은 별도 집계된다.
 - Cloud SQL, Serverless VPC Access connector, 최소 인스턴스 1 이상은 만들지 않는다.
 - 외부 MySQL 제공자의 무료 한도와 만료 정책은 별도로 확인한다.
@@ -58,7 +58,8 @@ Cloud Run은 `PORT`를 주입한다. 애플리케이션은 `0.0.0.0:${PORT}`에 
 | `DB_USERNAME` | Secret Manager | 전용 DB 사용자 |
 | `DB_PASSWORD` | Secret Manager | DB 비밀번호 |
 | `JWT_SECRET` | Secret Manager | 32바이트 이상 난수 |
-| `KAMIS_API_KEY` | Secret Manager | KAMIS Open API 인증 키. 저장과 배포 연결만 담당하며, 실제 시세 호출에는 별도 요청자 ID와 클라이언트 구현이 필요 |
+| `KAMIS_API_KEY` | Secret Manager | KAMIS Open API 인증 키 |
+| `KAMIS_CERT_ID` | Secret Manager | KAMIS 신청 계정의 요청자 ID (`p_cert_id`) |
 | `JWT_ISSUER` | Cloud Run env | 고정 issuer. 예: `urn:cityfarmerplus:api` |
 | `CORS_ALLOWED_ORIGINS` | Cloud Run env | 실제 프론트 Origin 목록 |
 | `FILE_STORAGE_TYPE` | Cloud Run env | `gcs` |
@@ -82,16 +83,21 @@ Cloud Run은 `PORT`를 주입한다. 애플리케이션은 `0.0.0.0:${PORT}`에 
 5. 실제 DB/JWT 값은 채팅, Git, 문서에 붙여 넣지 않고 사용자가 Cloud Shell 또는 GCP Console에 직접 입력한다.
 6. 외부 MySQL을 백업하고 현재 스키마와 애플리케이션 엔티티가 맞는지 확인한다. 운영 DB에는 `ddl-auto=update`를 사용하지 않는다.
 
-backend-2를 처음 배포할 때는 백업 후 `gcp/migrations/20260827_backend2_tables.sql`을 외부 MySQL에 한 번 적용한다. 이 migration은 대리 접수 감사 로그와 출결 정정 이력 테이블을 생성한다. 두 테이블이 조회되는 것을 확인한 뒤에만 `JPA_DDL_AUTO=validate` revision을 배포한다.
+통합 스키마가 아직 없는 운영 DB에 처음 배포할 때는 백업 후 `gcp/migrations/20260827_backend2_tables.sql`을 외부 MySQL에 한 번 적용한다. 이 migration은 대리 접수 감사 로그와 출결 정정 이력 테이블을 생성한다. 두 테이블이 조회되는 것을 확인한 뒤에만 `JPA_DDL_AUTO=validate` revision을 배포한다.
 
 Cloud Shell에서는 다음 전용 runner를 사용한다. 이 스크립트는 Secret Manager 값을 출력하지 않고 읽으며, DB read-only preflight → 전체 DB gzip dump → SHA-256 생성 → 비공개 GCS bucket 업로드·존재 확인 → migration 적용 → 신규 컬럼·테이블·인덱스·FK·NULL 검증 순서로 실행한다. 백업이 생성·업로드되지 않으면 migration을 시작하지 않는다.
 
 ```bash
-git clone --depth 1 --branch develop \
+git clone --depth 1 --branch main \
   https://github.com/ParkChanWoo0321/CityFarmerPlus_BE.git
 cd CityFarmerPlus_BE
+export CFP_DB_URL_VERSION="2"
+export CFP_DB_USERNAME_VERSION="3"
+export CFP_DB_PASSWORD_VERSION="3"
 bash gcp/migrate-backend2.sh
 ```
+
+세 변수는 모두 현재 운영 DB 자격증명 조합의 정확한 숫자 Secret version이어야 한다. `latest`나 일부 변수 생략은 다른 세대의 URL·사용자·비밀번호를 섞거나 잘못된 DB를 migration하는 위험 때문에 허용하지 않는다.
 
 성공 출력의 GCS 백업 URI와 SHA-256을 배포 기록에 보관한다. 과거 교육 제출의 당시 필수 시간은 기존 DB에 별도로 보존되지 않았으므로, `required_hours_snapshot`은 migration 실행 시점의 해당 과정 필수 시간으로 백필된다.
 
@@ -221,7 +227,7 @@ done
 
 ## 7. Secret Manager
 
-다섯 개의 secret을 만든다. 이미 존재하면 그대로 재사용한다.
+여섯 개의 secret을 만든다. 이미 존재하면 그대로 재사용한다.
 
 ```bash
 for SECRET in \
@@ -229,7 +235,8 @@ for SECRET in \
   cityfarmerplus-db-username \
   cityfarmerplus-db-password \
   cityfarmerplus-jwt-secret \
-  cityfarmerplus-kamis-api-key
+  cityfarmerplus-kamis-api-key \
+  cityfarmerplus-kamis-cert-id
 do
   gcloud secrets describe "$SECRET" >/dev/null 2>&1 || \
     gcloud secrets create "$SECRET" --replication-policy=automatic
@@ -268,9 +275,32 @@ KAMIS_API_KEY_VERSION="$(printf %s "$VALUE" | gcloud secrets versions add \
   cityfarmerplus-kamis-api-key --data-file=- --format='value(name)')"
 KAMIS_API_KEY_VERSION="${KAMIS_API_KEY_VERSION##*/}"
 unset VALUE
+
+IFS= read -r -s -p "KAMIS requester ID: " VALUE; echo
+KAMIS_CERT_ID_VERSION="$(printf %s "$VALUE" | gcloud secrets versions add \
+  cityfarmerplus-kamis-cert-id --data-file=- --format='value(name)')"
+KAMIS_CERT_ID_VERSION="${KAMIS_CERT_ID_VERSION##*/}"
+unset VALUE
 ```
 
 기존 로그인 token을 유지해야 한다면 운영 환경에서 사용 중인 JWT secret을 그대로 입력한다. 새 값으로 바꾸면 기존 로그인 token이 모두 무효가 된다. 새 version으로 회전할 때는 `versions add` → Cloud Run 참조 변경 → smoke test → 구 version disable 순서를 지킨다.
+
+DB 계정 회전은 기존 사용자의 비밀번호만 즉시 바꾸지 않는다. Aiven에 새 전용 service user를 만들고 새 username/password secret version을 추가한 다음 두 version을 한 쌍으로 지정해 새 revision을 검증한다. `gcp/deploy.sh`는 다음 명시적 version override를 지원한다.
+
+```bash
+export CFP_DB_URL_VERSION="2"
+export CFP_DB_USERNAME_VERSION="3"
+export CFP_DB_PASSWORD_VERSION="3"
+export CFP_JWT_SECRET_VERSION="3"
+export CFP_KAMIS_API_KEY_VERSION="1"
+export CFP_KAMIS_CERT_ID_VERSION="1"
+export JWT_ISSUER="urn:cityfarmerplus:api"
+bash gcp/deploy.sh
+```
+
+여섯 Secret version과 `JWT_ISSUER`를 모두 명시해야 한다. 스크립트는 각 숫자 version이 `ENABLED`인지 확인하고 Cloud Run에 숫자로 고정한다. 새 revision은 commit과 실행 시각을 포함한 고유 candidate 태그와 0% 트래픽으로 먼저 배포하고 `/health`와 KAMIS를 통과한 뒤에만 100% 트래픽으로 전환한다. 빌드 중 `origin/main`이 바뀌면 전환하지 않으며, 안정 URL 검증 또는 전환 이후 명령이 실패하거나 실행이 중단되면 직전 100% revision으로 자동 롤백한다. 회원가입·로그인, 인증 조회, DB 쓰기·재조회와 파일 검증까지 성공한 뒤에만 구 Secret version을 비활성화한다.
+
+DB 회전 전에는 직전 revision 이름, 여섯 Secret version, `JWT_ISSUER`를 배포 기록에 남긴다. 구 Aiven 사용자는 새 revision의 관찰 기간과 롤백 가능 기간이 모두 끝날 때까지 유지한다. Secret version을 먼저 비활성화했다가 롤백해야 한다면 해당 숫자 version을 다시 enable한 뒤 직전 revision으로 트래픽을 되돌린다.
 
 런타임 서비스 계정에는 필요한 secret만 읽을 수 있게 부여한다.
 
@@ -280,7 +310,8 @@ for SECRET in \
   cityfarmerplus-db-username \
   cityfarmerplus-db-password \
   cityfarmerplus-jwt-secret \
-  cityfarmerplus-kamis-api-key
+  cityfarmerplus-kamis-api-key \
+  cityfarmerplus-kamis-cert-id
 do
   gcloud secrets add-iam-policy-binding "$SECRET" \
     --member="serviceAccount:${RUNTIME_SA}" \
@@ -340,7 +371,7 @@ gcloud run deploy "$SERVICE" \
   --timeout=300 \
   --cpu-throttling \
   --env-vars-file=/tmp/cityfarmerplus-cloud-run.env.yaml \
-  --set-secrets="DB_URL=cityfarmerplus-db-url:${DB_URL_VERSION},DB_USERNAME=cityfarmerplus-db-username:${DB_USERNAME_VERSION},DB_PASSWORD=cityfarmerplus-db-password:${DB_PASSWORD_VERSION},JWT_SECRET=cityfarmerplus-jwt-secret:${JWT_SECRET_VERSION},KAMIS_API_KEY=cityfarmerplus-kamis-api-key:${KAMIS_API_KEY_VERSION}" \
+  --set-secrets="DB_URL=cityfarmerplus-db-url:${DB_URL_VERSION},DB_USERNAME=cityfarmerplus-db-username:${DB_USERNAME_VERSION},DB_PASSWORD=cityfarmerplus-db-password:${DB_PASSWORD_VERSION},JWT_SECRET=cityfarmerplus-jwt-secret:${JWT_SECRET_VERSION},KAMIS_API_KEY=cityfarmerplus-kamis-api-key:${KAMIS_API_KEY_VERSION},KAMIS_CERT_ID=cityfarmerplus-kamis-cert-id:${KAMIS_CERT_ID_VERSION}" \
   --startup-probe="httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=0,failureThreshold=24,timeoutSeconds=2,periodSeconds=10" \
   --liveness-probe="httpGet.path=/health/live,httpGet.port=8080,initialDelaySeconds=0,failureThreshold=3,timeoutSeconds=2,periodSeconds=30"
 
@@ -365,11 +396,12 @@ curl -i "${SERVICE_URL}/health"
 
 현재 운영값은 `1 vCPU`, `2 GiB`, 동시 실행 `1`, 최소 인스턴스 `0`, 최대 인스턴스 `1`이다. Spring Boot 통합 애플리케이션이 더 작은 메모리에서 기동 실패한 기록을 반영한 값이며, 무료 한도를 넘으면 과금될 수 있으므로 실제 활성 시간과 비용 알림을 함께 확인한다.
 
-저장소에 포함된 `gcp/bootstrap.sh`는 이 문서의 API·서비스 계정·전용 bucket·Secret 껍데기 생성을 멱등 실행한다. `gcp/deploy.sh`는 clean `main`이 최신 `origin/main`과 같은지 확인하고 secret의 숫자 version을 고정해 최초 수동 배포를 수행한다.
+저장소에 포함된 `gcp/bootstrap.sh`는 이 문서의 API·서비스 계정·전용 bucket·Secret 껍데기 생성을 멱등 실행한다. `gcp/deploy.sh`는 이미 정상 traffic을 제공 중인 Cloud Run 서비스의 무중단 갱신 전용이다. clean `main`이 최신 `origin/main`과 같은지 확인하고 여섯 Secret의 숫자 version과 운영 `JWT_ISSUER`를 명시적으로 고정해 후보 revision을 검증한 뒤 traffic을 전환한다. Cloud Run 서비스가 아직 없다면 이 절보다 앞선 최초 생성 절차를 먼저 수행한다.
 
 ```bash
 bash gcp/bootstrap.sh
-# 다섯 개 secret version을 안전하게 입력한 다음
+# 여섯 개 secret version을 안전하게 입력한 다음
+# CFP_*_VERSION 여섯 개와 JWT_ISSUER를 export
 bash gcp/deploy.sh
 ```
 
@@ -382,9 +414,12 @@ bash gcp/deploy.sh
 1. 브랜치가 `main`인지 확인한다.
 2. 전체 Gradle 테스트를 실행한다.
 3. Docker 이미지를 빌드하고 Artifact Registry에 push한다.
-4. 이미 만들어진 Cloud Run 서비스의 이미지와 허용 프론트 Origin을 갱신한다.
+4. 이미 만들어진 Cloud Run 서비스의 이미지와 허용 프론트 Origin을 build ID가 포함된 고유 0% candidate revision으로 갱신한다.
+5. candidate URL에서 `/health`와 KAMIS 실제 조회를 검사한다.
+6. GitHub `main`이 이 빌드 commit과 여전히 같은지 확인한다. 더 최신 commit이 있으면 오래된 빌드는 승격하지 않는다.
+7. 검사와 commit 확인이 성공한 정확한 candidate revision에만 100% 트래픽을 전환하고 안정 URL을 다시 검사한다. 전환 이후 실패·중단이 발생하면 직전 100% revision으로 자동 롤백하고 health를 재검증한다.
 
-따라서 최초 Cloud Run 서비스와 환경 변수·secret·서비스 계정은 8절에서 먼저 만들어야 한다.
+따라서 최초 Cloud Run 서비스와 환경 변수·여섯 Secret mapping·서비스 계정은 8절에서 먼저 만들어야 한다. 특히 `KAMIS_CERT_ID`가 기존 서비스에 매핑되지 않은 상태에서 main을 병합하면 candidate smoke가 실패하며 운영 트래픽은 기존 revision에 남는다. KAMIS secret 생성·version 입력·런타임 권한·Cloud Run mapping을 먼저 완료한다.
 
 Cloud Build trigger는 GCP Console에서 다음 값으로 만든다.
 
@@ -416,7 +451,7 @@ trigger가 사용하는 build 서비스 계정은 6절에서 만든 전용 계�
 - Cloud Build Editor
 - 런타임 서비스 계정에 대한 Service Account User
 
-GitHub 연결과 IAM 변경을 마친 뒤 `main` push로 한 번 실행하고, 테스트·이미지 push·Cloud Run revision 배포가 모두 성공했는지 확인한다. `_CORS_ALLOWED_ORIGINS`는 경로가 없는 정확한 Origin만 넣으며, 삭제된 프론트 주소를 남겨 두지 않는다.
+GitHub 연결과 IAM 변경을 마친 뒤 `main` push로 한 번 실행하고, 테스트·이미지 push·candidate smoke·트래픽 전환이 모두 성공했는지 확인한다. `_CORS_ALLOWED_ORIGINS`는 경로가 없는 정확한 Origin만 넣으며, 삭제된 프론트 주소를 남겨 두지 않는다.
 
 ## 10. 운영 Smoke Test
 
@@ -432,9 +467,20 @@ GitHub 연결과 IAM 변경을 마친 뒤 `main` push로 한 번 실행하고, �
 8. 로그에 DB 비밀번호, JWT secret, access token이 노출되지 않는다.
 9. 프론트엔드 API base URL을 새 `run.app` 주소로 바꾼다.
 
-KAMIS secret이 Cloud Run에 연결돼 있다는 사실만으로 시세 API가 동작하는 것은 아니다. KAMIS가 요구하는 요청자 ID를 확보하고, 애플리케이션의 HTTP client·응답 DTO·오류/timeout 정책·프론트용 API와 테스트를 구현한 뒤 별도 smoke test를 통과해야 완료로 판정한다.
+KAMIS 조회는 `KAMIS_API_KEY`와 `KAMIS_CERT_ID`가 모두 필요하다. 애플리케이션은 HTTPS client, timeout·1회 재시도, 1시간 캐시, 24시간 stale fallback과 공개 `/api/market-prices/latest` 계약을 제공한다. 배포 완료 판정에는 실제 인증쌍으로 이 API가 `200`, `provider=KAMIS`, 비어 있지 않은 `observedDate`를 반환하는 smoke test가 포함된다.
 
 JWT secret 또는 issuer를 바꾸면 기존 토큰은 무효가 되므로 사용자는 다시 로그인해야 한다.
+
+수동 롤백은 배포 기록에 남긴 직전 revision을 정확히 지정한다.
+
+```bash
+gcloud run services update-traffic cityfarmerplus-api \
+  --project="project-60a7cf7e-b36a-406b-b9e" \
+  --region="us-west1" \
+  --to-revisions="PREVIOUS_REVISION=100"
+```
+
+DB 자격증명 회전 뒤의 롤백은 구 Aiven 사용자가 아직 유효하고 직전 revision이 참조하는 Secret version이 `ENABLED`일 때만 가능하다. 따라서 새 운영 검증과 관찰 기간이 끝나기 전에 구 Aiven 사용자나 구 Secret version을 삭제하지 않는다.
 
 ## 11. Aiven 무료 DB keepalive
 

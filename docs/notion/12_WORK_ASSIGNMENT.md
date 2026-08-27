@@ -1,15 +1,16 @@
 # 근무 일정·출근·작업 안내 API
 
 - 기준일: 2026-08-20
-- 기준: 현재 `backend-1` 코드
+- 기준: 현재 `main` 통합 코드
 - 로컬 Base URL: `http://localhost:8080`
+- 운영 Base URL: `https://cityfarmerplus-api-82951616760.us-west1.run.app`
 - API 수: 6개
 
 ## 기능 범위
 
 - 도시농부: 내 확정 근무 일정 목록/상세, 작업 안내 조회
 - 농가: 내 농가의 확정 근무 목록, 출근/결근 등록, 근무 완료 확정
-- 근무 일정은 이 API들이 생성하지 않는다. `backend-2` 중개센터가 지원자를 매칭할 때 생성해야 한다.
+- 근무 일정은 이 사용자 API들이 생성하지 않는다. 현재 통합된 `CENTER_ADMIN` 매칭 API가 지원자를 확정할 때 생성한다.
 
 ## 인증
 
@@ -78,7 +79,7 @@
 
 - 공고·농가 정보는 매칭 시점에 근무 일정으로 복사되며, 이후 공고/농가 프로필 변경에 따라 자동 수정되지 않는 스냅샷이다.
 - `recruitmentCapacity`는 매칭 당시 공고 모집 인원이다. 새 근무 배정은 공고 capacity를 저장하고, 필드 추가 전 생성된 기존 DB 행은 `null`일 수 있다.
-- `confirmedBy*`는 `backend-2`에서 매칭을 확정한 사용자 정보다. 매칭 정보가 없으면 `null`이다.
+- `confirmedBy*`는 `CENTER_ADMIN`이 매칭을 확정한 사용자 정보다. 매칭 정보가 없으면 `null`이다.
 - 현재 DTO는 확정자의 연락처까지 도시농부와 농가 근무 응답에 포함한다. 실제 운영 전 공개 필요성을 검토해야 한다.
 - `wageAmount`/`wageUnit`는 안내 스냅샷으로, 서비스가 결제·송금·정산하지 않는다.
 
@@ -301,7 +302,7 @@
 
 `ABSENT`를 등록하면 근무 `status` = `NO_SHOW`, 지원 `status` = `NO_SHOW`로 함께 변경된다.
 
-프론트엔드는 네트워크 타임아웃으로 첫 응답을 받지 못했더라도 같은 `status`로 안전하게 재시도할 수 있다. 기존 값과 다른 정정은 backend-1 API로 하지 않는다.
+프론트엔드는 네트워크 타임아웃으로 첫 응답을 받지 못했더라도 같은 `status`로 안전하게 재시도할 수 있다. 기존 값과 다른 정정은 농가 사용자 API가 아니라 `POST /api/admin/work-assignments/{assignmentId}/attendance-correction`으로 처리한다.
 
 오류: `VALIDATION_ERROR`/`INVALID_REQUEST`(400), `INVALID_WORK_ASSIGNMENT_STATE`(409, `NOT_RECORDED` 요청·기존과 다른 출결 변경 요청 등), `WORK_ASSIGNMENT_NOT_FOUND`(404), `WORK_ASSIGNMENT_NOT_OWNER`(403), `CONCURRENT_UPDATE_CONFLICT`(409).
 
@@ -360,27 +361,27 @@
 
 ```bash
 # 도시농부 근무 목록
-curl "http://localhost:8080/api/urban-farmers/me/work-assignments?view=UPCOMING&page=0&size=20" \
+curl "{{baseUrl}}/api/urban-farmers/me/work-assignments?view=UPCOMING&page=0&size=20" \
   -H "Authorization: Bearer {{urbanFarmerAccessToken}}"
 
 # 작업 안내
-curl "http://localhost:8080/api/urban-farmers/me/work-assignments/701/guide" \
+curl "{{baseUrl}}/api/urban-farmers/me/work-assignments/701/guide" \
   -H "Authorization: Bearer {{urbanFarmerAccessToken}}"
 
 # 농가가 출근 등록
-curl -X PUT "http://localhost:8080/api/farm/work-assignments/701/attendance" \
+curl -X PUT "{{baseUrl}}/api/farm/work-assignments/701/attendance" \
   -H "Authorization: Bearer {{farmAccessToken}}" \
   -H "Content-Type: application/json" \
   -d '{"status":"PRESENT"}'
 
 # 농가가 근무 완료 확정
-curl -X POST "http://localhost:8080/api/farm/work-assignments/701/complete" \
+curl -X POST "{{baseUrl}}/api/farm/work-assignments/701/complete" \
   -H "Authorization: Bearer {{farmAccessToken}}"
 ```
 
-## 현재 제한과 `backend-2` 책임
+## 현재 제한과 중개센터 역할
 
-- 매칭 확정과 `WorkAssignment` 생성은 `backend-2`가 담당해야 한다. `backend-1` 사용자 API는 이미 생성된 일정을 조회/처리한다.
-- 농가는 출근/결근을 최초 등록하고 같은 값만 멱등적으로 재시도할 수 있다. 오등록 정정 API는 없으며, 정정과 이에 따른 지원/공고 상태 복구는 `backend-2` 담당자 기능이다.
+- 매칭 확정과 `WorkAssignment` 생성은 현재 통합된 `CENTER_ADMIN` API가 처리한다. 사용자 API는 이미 생성된 일정을 조회·처리한다.
+- 농가는 출근/결근을 최초 등록하고 같은 값만 멱등적으로 재시도할 수 있다. 오등록 정정과 이에 따른 지원·공고 상태 복구는 `POST /api/admin/work-assignments/{assignmentId}/attendance-correction`이 처리한다.
 - 도시농부는 자기의 출근 상태를 직접 변경할 수 없다.
 - 작업 안내는 규칙 기반이므로 농가가 작성한 공고와 현장 지침을 우선해야 한다.
