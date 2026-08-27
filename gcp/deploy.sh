@@ -196,7 +196,8 @@ if [[ -z "${PREVIOUS_REVISION}" ]]; then
   echo 'An existing Cloud Run service with one 100% production revision is required.' >&2
   exit 1
 fi
-CANDIDATE_TAG="candidate-${SHORT_SHA}-$(date -u +'%s%N')"
+CANDIDATE_NONCE="$(printf '%04x%04x' "${RANDOM}" "${RANDOM}")"
+CANDIDATE_TAG="c-${SHORT_SHA}-${CANDIDATE_NONCE}"
 
 gcloud run deploy "${SERVICE}" \
   --project="${PROJECT_ID}" \

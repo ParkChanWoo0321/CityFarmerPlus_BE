@@ -124,7 +124,8 @@ steps:
           echo "Current 100% production revision could not be resolved." >&2
           exit 1
         fi
-        CANDIDATE_TAG="candidate-$BUILD_ID"
+        BUILD_TOKEN="$$(printf '%s' "$BUILD_ID" | cut -c1-8)"
+        CANDIDATE_TAG="c-${_TAG}-$$BUILD_TOKEN"
         gcloud run deploy "${_SERVICE}" \
           --project="$PROJECT_ID" \
           --region="${_REGION}" \
