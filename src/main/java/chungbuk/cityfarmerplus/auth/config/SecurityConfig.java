@@ -55,6 +55,8 @@ public class SecurityConfig {
                         .permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/check-id")
                         .permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/internal/center-admins")
+                        .permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/education/courses")
                         .permitAll()
                         .requestMatchers(
@@ -68,6 +70,10 @@ public class SecurityConfig {
                         .permitAll()
                         .requestMatchers("/error")
                         .permitAll()
+                        .requestMatchers("/api/urban-farmer/**")
+                        .hasRole("URBAN_FARMER")
+                        .requestMatchers("/api/admin/**")
+                        .hasRole("CENTER_ADMIN")
                         .anyRequest()
                         .authenticated())
                 .oauth2ResourceServer(resourceServer -> resourceServer

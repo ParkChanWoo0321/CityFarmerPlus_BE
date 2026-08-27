@@ -79,6 +79,8 @@ Cloud Run은 `PORT`를 주입한다. 애플리케이션은 `0.0.0.0:${PORT}`에 
 5. 실제 DB/JWT 값은 채팅, Git, 문서에 붙여 넣지 않고 사용자가 Cloud Shell 또는 GCP Console에 직접 입력한다.
 6. 외부 MySQL을 백업하고 현재 스키마와 애플리케이션 엔티티가 맞는지 확인한다. 운영 DB에는 `ddl-auto=update`를 사용하지 않는다.
 
+backend-2를 처음 배포할 때는 백업 후 `gcp/migrations/20260827_backend2_tables.sql`을 외부 MySQL에 한 번 적용한다. 이 migration은 대리 접수 감사 로그와 출결 정정 이력 테이블을 생성한다. 두 테이블이 조회되는 것을 확인한 뒤에만 `JPA_DDL_AUTO=validate` revision을 배포한다.
+
 로컬 PC에 `gcloud`가 없다면 무료 Cloud Shell에서 아래 명령을 실행할 수 있다.
 
 ```bash
@@ -309,7 +311,7 @@ gcloud run deploy "$SERVICE" \
   --service-account="$RUNTIME_SA" \
   --port=8080 \
   --cpu=1 \
-  --memory=512Mi \
+  --memory=2Gi \
   --concurrency=1 \
   --min=0 \
   --max=1 \
@@ -380,7 +382,7 @@ Cloud Build trigger는 GCP Console에서 다음 값으로 만든다.
 | `_SERVICE` | `cityfarmerplus-api` |
 | `_TAG` | `$SHORT_SHA` |
 | `_DEPLOY` | `true` |
-| `_CORS_ALLOWED_ORIGINS` | 로컬 연동 중에는 `http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000`, 프론트 배포 후에는 실제 Origin 목록 |
+| `_CORS_ALLOWED_ORIGINS` | `https://cityfarmerplus.site,https://www.cityfarmerplus.site`와 필요한 로컬 개발 Origin 목록 |
 
 Trigger 위치와 배포 위치는 서로 다르다. Trigger는 별도 private pool이 필요 없는 `global` 기본 pool에서 실행하고, `_REGION=us-west1`을 통해 Artifact Registry와 Cloud Run은 `us-west1`에 배포한다.
 
@@ -415,6 +417,7 @@ JWT secret 또는 issuer를 바꾸면 기존 토큰은 무효가 되므로 사�
 - Cloud Run request-based CPU와 `min=0`에서는 요청이 없을 때 `@Scheduled` 작업 실행이 보장되지 않는다. 현재 파일 삭제 재시도 worker는 best-effort다.
 - 무료 운영에서는 keep-alive용 주기 ping을 두지 않는다. 인위적인 요청은 scale-to-zero를 방해하고 무료 사용량을 소비한다.
 - Cloud Run HTTP/1 요청 한도에 맞춰 multipart 전체 요청 크기는 31MB로 제한한다.
+- 현재 Spring Boot 런타임은 512MiB에서 메모리 한도를 초과했으므로 운영 기준을 2GiB로 유지한다. 이 설정은 1 vCPU의 요청 기반 무료 CPU·RAM 할당량을 약 50시간의 활성 시간까지 균형 있게 사용한다.
 - 외부 MySQL의 IP allowlist가 고정 IP만 허용하면 Cloud Run에서 연결되지 않을 수 있다.
 - 현재 Aiven 무료 MySQL은 장기간 활동이 없으면 자동으로 꺼질 수 있다. 이 경우 GCP 리소스가 정상이어도 애플리케이션 기동 시 DB DNS/연결 오류로 `5xx`가 발생한다.
 - 장애 확인 순서는 Aiven 서비스 `Running` 확인 → 공개 DNS/포트 확인 → `GET /api/education/courses`처럼 DB를 읽는 API 확인이다. `/health`만으로는 DB 연결을 증명할 수 없다.
