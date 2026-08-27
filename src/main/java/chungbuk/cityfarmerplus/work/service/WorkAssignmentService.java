@@ -137,7 +137,7 @@ public class WorkAssignmentService {
             int page,
             int size
     ) {
-        FarmProfile farm = accessService.requireApprovedFarm(farmUserId);
+        FarmProfile farm = accessService.requireFarmProfile(farmUserId);
         var pageable = PageRequest.of(page, size, Sort.by(
                 Sort.Order.desc("workDate"),
                 Sort.Order.desc("startTime"),
@@ -155,7 +155,7 @@ public class WorkAssignmentService {
             Long assignmentId,
             WorkAssignment.AttendanceStatus status
     ) {
-        FarmProfile farm = accessService.requireApprovedFarmForUpdate(farmUserId);
+        FarmProfile farm = accessService.requireFarmProfileForUpdate(farmUserId);
         WorkAssignment snapshot = getFarmOwnedAssignment(farm, assignmentId);
         JobPosting posting = postingRepository.findByIdForUpdate(snapshot.getJobPostingId())
                 .orElseThrow(JobPostingException::notFound);
@@ -181,7 +181,7 @@ public class WorkAssignmentService {
 
     @Transactional
     public WorkAssignmentResponse completeByFarm(Long farmUserId, Long assignmentId) {
-        FarmProfile farm = accessService.requireApprovedFarmForUpdate(farmUserId);
+        FarmProfile farm = accessService.requireFarmProfileForUpdate(farmUserId);
         WorkAssignment snapshot = getFarmOwnedAssignment(farm, assignmentId);
         JobPosting posting = postingRepository.findByIdForUpdate(snapshot.getJobPostingId())
                 .orElseThrow(JobPostingException::notFound);

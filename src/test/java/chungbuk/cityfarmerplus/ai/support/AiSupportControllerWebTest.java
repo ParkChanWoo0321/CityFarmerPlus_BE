@@ -52,7 +52,7 @@ class AiSupportControllerWebTest {
                 71L,
                 "농가 모집 공고 작성 방법",
                 "농가 공고",
-                "승인된 농가는 공고를 작성할 수 있습니다.",
+                "프로필을 저장한 농가는 공고를 작성할 수 있습니다.",
                 false,
                 createdAt
         ));
@@ -69,7 +69,7 @@ class AiSupportControllerWebTest {
                 .andExpect(jsonPath("$.question").value("농가 모집 공고 작성 방법"))
                 .andExpect(jsonPath("$.category").value("농가 공고"))
                 .andExpect(jsonPath("$.answer")
-                        .value("승인된 농가는 공고를 작성할 수 있습니다."))
+                        .value("프로필을 저장한 농가는 공고를 작성할 수 있습니다."))
                 .andExpect(jsonPath("$.officialConfirmationRequired").value(false))
                 .andExpect(jsonPath("$.createdAt").value("2026-08-20T03:04:05Z"));
 

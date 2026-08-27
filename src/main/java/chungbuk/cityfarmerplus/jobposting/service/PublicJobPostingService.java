@@ -126,7 +126,7 @@ public class PublicJobPostingService {
                         now
                 )
                 .and(JobPostingSpecifications.wasApprovedForPublicView())
-                .and(JobPostingSpecifications.hasActiveApprovedFarm());
+                .and(JobPostingSpecifications.hasActiveFarmOwner());
         specification = andIfPresent(
                 specification,
                 JobPostingSpecifications.keywordContains(keyword)
@@ -255,9 +255,6 @@ public class PublicJobPostingService {
             LocalTime now
     ) {
         if (posting.getApprovedAt() == null
-                || posting.getFarmProfile().getStatus()
-                != chungbuk.cityfarmerplus.farm.entity.FarmProfile
-                .FarmProfileStatus.APPROVED
                 || !posting.getFarmProfile().getOwner().isActive()) {
             return false;
         }

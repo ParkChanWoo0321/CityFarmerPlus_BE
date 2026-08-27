@@ -6,7 +6,6 @@ import chungbuk.cityfarmerplus.auth.repository.UserRepository;
 import chungbuk.cityfarmerplus.farm.entity.FarmProfile;
 import chungbuk.cityfarmerplus.farm.exception.FarmProfileException;
 import chungbuk.cityfarmerplus.farm.repository.FarmProfileRepository;
-import chungbuk.cityfarmerplus.jobposting.exception.JobPostingException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -17,15 +16,7 @@ public class JobPostingAccessService {
     private final UserRepository userRepository;
     private final FarmProfileRepository farmProfileRepository;
 
-    public FarmProfile requireApprovedFarm(Long userId) {
-        FarmProfile profile = requireFarmProfile(userId);
-        if (profile.getStatus() != FarmProfile.FarmProfileStatus.APPROVED) {
-            throw JobPostingException.farmApprovalRequired();
-        }
-        return profile;
-    }
-
-    public FarmProfile requireApprovedFarmForUpdate(Long userId) {
+    public FarmProfile requireFarmProfileForUpdate(Long userId) {
         User user = userRepository.findByIdForUpdate(userId)
                 .orElseThrow(AuthException::userNotFound);
         if (!user.isActive()) {
@@ -34,12 +25,8 @@ public class JobPostingAccessService {
         if (user.getUserType() != User.UserType.FARM) {
             throw FarmProfileException.farmRoleRequired();
         }
-        FarmProfile profile = farmProfileRepository.findByOwnerIdForUpdate(userId)
+        return farmProfileRepository.findByOwnerIdForUpdate(userId)
                 .orElseThrow(FarmProfileException::profileNotFound);
-        if (profile.getStatus() != FarmProfile.FarmProfileStatus.APPROVED) {
-            throw JobPostingException.farmApprovalRequired();
-        }
-        return profile;
     }
 
     public FarmProfile requireFarmProfile(Long userId) {

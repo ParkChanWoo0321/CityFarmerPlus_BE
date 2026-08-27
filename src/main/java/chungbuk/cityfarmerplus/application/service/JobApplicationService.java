@@ -48,9 +48,6 @@ public class JobApplicationService {
                         LocalDate.now(SERVICE_ZONE),
                         LocalTime.now(SERVICE_ZONE)
                 ))
-                .filter(value -> value.getFarmProfile().getStatus()
-                        == chungbuk.cityfarmerplus.farm.entity.FarmProfile.FarmProfileStatus.APPROVED)
-                .filter(value -> value.getFarmProfile().getOwner().isActive())
                 .orElseThrow(JobPostingException::notOpen);
         User urbanFarmer = requireActiveUrbanFarmerForUpdate(userId);
         educationEligibilityService.requireApproved(userId);

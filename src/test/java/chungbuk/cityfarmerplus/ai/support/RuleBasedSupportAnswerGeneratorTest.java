@@ -31,7 +31,7 @@ class RuleBasedSupportAnswerGeneratorTest {
         SupportAnswer answer = generator.answer("농가 모집 공고 작성은 어떻게 하나요?");
 
         assertThat(answer.category()).isEqualTo("농가 공고");
-        assertThat(answer.answer()).contains("농가 소유 증빙", "담당자가 승인");
+        assertThat(answer.answer()).contains("농가 프로필", "공고를 승인");
         assertThat(answer.officialConfirmationRequired()).isFalse();
     }
 

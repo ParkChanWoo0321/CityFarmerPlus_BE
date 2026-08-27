@@ -1,5 +1,6 @@
 package chungbuk.cityfarmerplus.ai.jobposting;
 
+import chungbuk.cityfarmerplus.farm.exception.FarmProfileException;
 import chungbuk.cityfarmerplus.jobposting.exception.JobPostingException;
 import chungbuk.cityfarmerplus.jobposting.service.JobPostingAccessService;
 import chungbuk.cityfarmerplus.jobposting.service.JobPostingScheduleValidator;
@@ -36,7 +37,7 @@ class AiJobPostingServiceTest {
     private AiJobPostingService service;
 
     @Test
-    void approvedFarmReceivesPreviewAfterScheduleValidation() {
+    void farmWithSavedProfileReceivesPreviewAfterScheduleValidation() {
         AiJobPostingPreviewRequest request = validRequest();
         AiJobPostingPreviewResponse expected = previewResponse();
         when(generator.generate(request)).thenReturn(expected);
@@ -45,7 +46,7 @@ class AiJobPostingServiceTest {
 
         assertThat(actual).isSameAs(expected);
         InOrder order = inOrder(accessService, scheduleValidator, generator);
-        order.verify(accessService).requireApprovedFarm(15L);
+        order.verify(accessService).requireFarmProfile(15L);
         order.verify(scheduleValidator).validate(
                 request.workDate(),
                 request.startTime(),
@@ -55,15 +56,15 @@ class AiJobPostingServiceTest {
     }
 
     @Test
-    void unapprovedFarmCannotInvokeScheduleValidationOrGenerator() {
+    void farmWithoutProfileCannotInvokeScheduleValidationOrGenerator() {
         AiJobPostingPreviewRequest request = validRequest();
-        when(accessService.requireApprovedFarm(15L))
-                .thenThrow(JobPostingException.farmApprovalRequired());
+        when(accessService.requireFarmProfile(15L))
+                .thenThrow(FarmProfileException.profileNotFound());
 
         assertThatThrownBy(() -> service.preview(15L, request))
-                .isInstanceOf(JobPostingException.class)
+                .isInstanceOf(FarmProfileException.class)
                 .extracting("code")
-                .isEqualTo("FARM_APPROVAL_REQUIRED");
+                .isEqualTo("FARM_PROFILE_NOT_FOUND");
 
         verifyNoInteractions(scheduleValidator, generator);
     }
