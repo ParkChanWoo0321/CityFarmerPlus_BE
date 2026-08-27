@@ -3,6 +3,7 @@ package chungbuk.cityfarmerplus.admin.farm.controller;
 import chungbuk.cityfarmerplus.admin.farm.service.AdminFarmOwnershipService;
 import chungbuk.cityfarmerplus.auth.config.SecurityConfig;
 import chungbuk.cityfarmerplus.auth.exception.GlobalExceptionHandler;
+import chungbuk.cityfarmerplus.farm.entity.FarmProfile;
 import chungbuk.cityfarmerplus.farm.ownership.dto.FarmOwnershipDocumentDownload;
 import chungbuk.cityfarmerplus.farm.ownership.service.FarmOwnershipQueryService;
 import org.junit.jupiter.api.Test;
@@ -17,7 +18,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
+import java.util.List;
 
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -43,6 +46,36 @@ class AdminFarmOwnershipControllerWebTest {
 
     @MockitoBean
     private JwtDecoder jwtDecoder;
+
+    @Test
+    void centerAdminListsEveryFarmProfileWhenStatusIsOmitted() throws Exception {
+        when(jwtDecoder.decode("admin-jwt")).thenReturn(jwt("30", "CENTER_ADMIN"));
+        when(farmOwnershipService.list(null)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/admin/farm-profiles")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer admin-jwt"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("[]"));
+
+        verify(farmOwnershipService).list(null);
+    }
+
+    @Test
+    void centerAdminFiltersFarmProfilesByStatus() throws Exception {
+        when(jwtDecoder.decode("admin-jwt")).thenReturn(jwt("30", "CENTER_ADMIN"));
+        when(farmOwnershipService.list(FarmProfile.FarmProfileStatus.PENDING_REVIEW))
+                .thenReturn(List.of());
+
+        mockMvc.perform(get("/api/admin/farm-profiles")
+                        .param("status", "PENDING_REVIEW")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer admin-jwt"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("[]"));
+
+        verify(farmOwnershipService).list(
+                FarmProfile.FarmProfileStatus.PENDING_REVIEW
+        );
+    }
 
     @Test
     void centerAdminDownloadsFarmOwnershipEvidence() throws Exception {
