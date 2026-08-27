@@ -7,12 +7,12 @@ import chungbuk.cityfarmerplus.admin.jobposting.service.AdminJobPostingMatchingS
 import chungbuk.cityfarmerplus.admin.jobposting.service.AdminJobPostingService;
 import chungbuk.cityfarmerplus.application.dto.JobCandidateResponse;
 import chungbuk.cityfarmerplus.common.web.AuthenticatedUser;
+import chungbuk.cityfarmerplus.common.web.PageResponse;
 import chungbuk.cityfarmerplus.jobposting.dto.JobPostingResponse;
 import chungbuk.cityfarmerplus.jobposting.dto.JobPostingReviewResponse;
 import chungbuk.cityfarmerplus.work.dto.WorkAssignmentResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -37,8 +37,11 @@ public class AdminJobPostingController {
     private final AdminJobPostingMatchingService matchingService;
 
     @GetMapping
-    public ResponseEntity<Page<JobPostingResponse>> list(Pageable pageable) {
-        return ResponseEntity.ok(jobPostingService.list(pageable));
+    public ResponseEntity<PageResponse<JobPostingResponse>> list(Pageable pageable) {
+        return ResponseEntity.ok(PageResponse.from(
+                jobPostingService.list(pageable),
+                response -> response
+        ));
     }
 
     @PostMapping("/{postingId}/approve")

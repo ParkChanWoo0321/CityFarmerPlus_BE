@@ -169,7 +169,8 @@ class UrbanFarmerEducationControllerWebTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer urban-jwt"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(100))
-                .andExpect(jsonPath("$.courseTitle").value("농업안전 기초"));
+                .andExpect(jsonPath("$.courseTitle").value("농업안전 기초"))
+                .andExpect(jsonPath("$.requiredHoursSnapshot").value(8));
 
         verify(submissionService).getHistory(21L);
         verify(submissionService).getMine(21L, 100L);
@@ -262,6 +263,7 @@ class UrbanFarmerEducationControllerWebTest {
                 "도시농부",
                 1L,
                 "농업안전 기초",
+                8,
                 1,
                 LocalDate.of(2026, 8, 1),
                 8,

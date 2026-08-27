@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -71,13 +72,6 @@ public class AdminJobPostingMatchingService {
         if (applications.size() != distinctIds.size()) {
             throw JobApplicationException.notFound();
         }
-
-        long currentlyMatched = jobApplicationRepository
-                .countByJobPostingIdAndStatus(postingId, JobApplication.ApplicationStatus.MATCHED);
-        if (currentlyMatched + applications.size() > posting.getCapacity()) {
-            throw JobApplicationException.capacityExceeded();
-        }
-
         for (JobApplication application : applications) {
             if (!application.getJobPosting().getId().equals(postingId)) {
                 throw JobApplicationException.notFound();
@@ -85,13 +79,36 @@ public class AdminJobPostingMatchingService {
             if (application.getStatus() != JobApplication.ApplicationStatus.APPLIED) {
                 throw JobApplicationException.invalidState("지원 완료 상태만 매칭할 수 있습니다.");
             }
-            long overlapping = workAssignmentRepository.countOverlappingAssignments(
-                    application.getUrbanFarmer().getId(),
-                    posting.getWorkDate(),
-                    posting.getStartTime(),
-                    posting.getEndTime()
-            );
-            if (overlapping > 0) {
+        }
+
+        Set<Long> urbanFarmerIds = applications.stream()
+                .map(application -> application.getUrbanFarmer().getId())
+                .collect(Collectors.toSet());
+        if (userRepository.findAllByIdForUpdate(urbanFarmerIds).size()
+                != urbanFarmerIds.size()) {
+            throw AuthException.userNotFound();
+        }
+
+        long currentlyMatched = jobApplicationRepository
+                .findByJobPostingIdAndStatusForUpdate(
+                        postingId,
+                        JobApplication.ApplicationStatus.MATCHED
+                )
+                .size();
+        if (currentlyMatched + applications.size() > posting.getCapacity()) {
+            throw JobApplicationException.capacityExceeded();
+        }
+
+        for (JobApplication application : applications) {
+            boolean overlapping = !workAssignmentRepository
+                    .findOverlappingAssignmentsForUpdate(
+                            application.getUrbanFarmer().getId(),
+                            posting.getWorkDate(),
+                            posting.getStartTime(),
+                            posting.getEndTime()
+                    )
+                    .isEmpty();
+            if (overlapping) {
                 throw JobApplicationException.overlappingAssignment();
             }
         }
@@ -111,12 +128,14 @@ public class AdminJobPostingMatchingService {
                 })
                 .toList();
 
-        long matchedCount = jobApplicationRepository
-                .countByJobPostingIdAndStatus(postingId, JobApplication.ApplicationStatus.MATCHED);
+        long matchedCount = currentlyMatched + applications.size();
         if (matchedCount >= posting.getCapacity()) {
             posting.closeWhenCapacityReached((int) matchedCount, now);
             jobApplicationRepository
-                    .findByJobPostingIdAndStatus(postingId, JobApplication.ApplicationStatus.APPLIED)
+                    .findByJobPostingIdAndStatusForUpdate(
+                            postingId,
+                            JobApplication.ApplicationStatus.APPLIED
+                    )
                     .forEach(JobApplication::markNotMatched);
         }
 

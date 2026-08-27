@@ -1,34 +1,40 @@
 # CityFarmerPlus API 명세 인덱스
 
-- 문서 버전: 3.1
-- 갱신일: 2026-08-20
-- 기준: 현재 backend-1의 Controller·DTO·Security·Service 코드
-- 현재 HTTP 작업 수: 66개
+- 문서 버전: 4.0
+- 갱신일: 2026-08-27
+- 기준: backend-1 + backend-2 통합 후 현재 Controller·DTO·Security·Service 코드
+- 현재 HTTP 작업 수: 110개 (`OPTIONS` preflight 제외, 메서드 매핑 기준)
 
 ## 1. 기준 문서
 
 | 문서 | 용도 | 현황 |
 |---|---|---|
-| [FULL_API_SPEC.md](FULL_API_SPEC.md) | 노션·프론트·Postman용 전체 통합 명세 | 현재 66개 HTTP 작업 기준 |
+| [FULL_API_SPEC.md](FULL_API_SPEC.md) | 사용자 API 공통 계약과 상세 명세 | 사용자 업무 API + health 기준 |
 | [AUTH_API_SPEC.md](AUTH_API_SPEC.md) | 회원가입, JWT, 내 정보, 탈퇴 | 현재 코드 반영 |
 | [FARM_PROFILE_API_SPEC.md](FARM_PROFILE_API_SPEC.md) | 농가 프로필 생성·조회·수정 | 현재 코드 반영 |
 | [FARM_OWNERSHIP_SUBMISSION_API_SPEC.md](FARM_OWNERSHIP_SUBMISSION_API_SPEC.md) | 농가 소유 증빙 제출·이력·파일 조회 | 현재 코드 반영 |
-| [NOTION_API_SPEC.md](NOTION_API_SPEC.md) | 노션 복사용 요약본 | 현재 66개 HTTP 작업 기준 |
+| [NOTION_API_SPEC.md](NOTION_API_SPEC.md) | 노션 복사용 사용자 API 요약본 | 관리자 API는 아래 전용 명세를 함께 사용 |
 | [notion/04A_PARTICIPATION_FORM.md](notion/04A_PARTICIPATION_FORM.md) | 디자인 한 화면용 통합 신청 폼 3 API | 현재 코드 반영 |
 | [notion/10_PUBLIC_JOB_POSTING.md](notion/10_PUBLIC_JOB_POSTING.md) | 모집 중·마감 공고 검색과 내 지원 요약 | 현재 코드 반영 |
 | [notion/11_JOB_APPLICATION.md](notion/11_JOB_APPLICATION.md) | 공고 지원과 지원 시점 조건 스냅샷 | 현재 코드 반영 |
+| [ADMIN_DASHBOARD_API_SPEC.md](ADMIN_DASHBOARD_API_SPEC.md) | 관리자 대시보드 | 현재 코드 반영 |
+| [ADMIN_PARTICIPATION_APPLICATION_API_SPEC.md](ADMIN_PARTICIPATION_APPLICATION_API_SPEC.md) | 사업참여 심사 | 현재 코드 반영 |
+| [ADMIN_EDUCATION_COURSE_API_SPEC.md](ADMIN_EDUCATION_COURSE_API_SPEC.md) | 교육 과정 관리 | 현재 코드 반영 |
+| [ADMIN_EDUCATION_SUBMISSION_API_SPEC.md](ADMIN_EDUCATION_SUBMISSION_API_SPEC.md) | 교육 제출 심사·증빙 다운로드 | 현재 코드 반영 |
+| [ADMIN_FARM_OWNERSHIP_API_SPEC.md](ADMIN_FARM_OWNERSHIP_API_SPEC.md) | 농가 소유 증빙 심사·다운로드 | 현재 코드 반영 |
+| [ADMIN_JOB_POSTING_API_SPEC.md](ADMIN_JOB_POSTING_API_SPEC.md) | 공고 심사·수정·매칭 | 현재 코드 반영 |
+| [ADMIN_WORK_ASSIGNMENT_API_SPEC.md](ADMIN_WORK_ASSIGNMENT_API_SPEC.md) | 근무 조회·출결 정정 | 현재 코드 반영 |
+| [ADMIN_PROXY_REGISTRATION_API_SPEC.md](ADMIN_PROXY_REGISTRATION_API_SPEC.md) | 관리자 대리 접수 | 현재 코드 반영 |
 
-새 프론트 연동과 Postman 컬렉션은 `FULL_API_SPEC.md`를 기준으로 한다.
+새 프론트 연동과 Postman 컬렉션은 사용자 API는 `FULL_API_SPEC.md`, 관리자 API는 위 `ADMIN_*_API_SPEC.md`를 기준으로 한다.
 
 ## 2. 현재 구현 현황
 
-| 접근 구분 | HTTP 작업 수 |
+| 코드 영역 | HTTP 작업 수 |
 |---|---:|
-| 인증 없이 호출 가능 | 4 |
-| 로그인 사용자 공통 | 9 |
-| 도시농부 전용 | 29 |
-| 농가 전용 | 24 |
-| 합계 | **66** |
+| 사용자·공개·health 영역 | 68 |
+| `/api/admin/**` 영역 | 42 |
+| 합계 | **110** |
 
 기능별 집계:
 
@@ -43,7 +49,9 @@
 | 근무·출결·작업 안내 | 6 | 도시농부 3, 농가 3 |
 | 홈 | 2 | 도시농부 홈, 농가 홈 |
 | FAQ·AI 상담 | 3 | FAQ 1, 상담 2 |
-| 합계 | **66** | Controller 메서드 매핑 기준 |
+| health | 2 | readiness(`/health`), liveness(`/health/live`) |
+| 관리자 | 42 | 계정 발급, 대시보드, 심사, 과정, 공고·매칭, 출결 정정, 대리 접수 |
+| 합계 | **110** | Controller 메서드 매핑 기준 |
 
 ## 3. 인증 기준
 
@@ -63,11 +71,9 @@ Authorization: Bearer {{accessToken}}
 
 이름이 Public인 공고 조회 컨트롤러와 FAQ도 현재 전역 보안 설정상 Bearer JWT가 필요하다.
 
-## 4. backend-1과 backend-2 경계
+## 4. backend-1과 backend-2 통합 상태
 
-backend-1에는 중개센터 전용 업무 API와 담당자 내부 계정 발급 API가 없다.
-
-다만 다음은 backend-2 병합 시 같은 DB와 상태 모델을 사용하기 위한 공통 계약으로 유지한다.
+현재 develop 기준에는 backend-1 사용자 기능과 backend-2 중개센터 기능이 함께 들어 있다. 다음 계약은 동일한 DB와 트랜잭션 경계로 연결된다.
 
 - `CENTER_ADMIN` 사용자 유형
 - 농가·교육·사업참여·공고의 승인·반려 상태
@@ -76,14 +82,7 @@ backend-1에는 중개센터 전용 업무 API와 담당자 내부 계정 발급
 - 지원의 `MATCHED`, `NOT_MATCHED` 상태와 확정 담당자
 - 출결 정정 상태와 정정 이력 모델
 
-따라서 backend-1 단독 실행에서는 다음 작업을 HTTP로 완료할 수 없다.
-
-- 담당자 계정 생성
-- 사업참여·교육·농가 소유 증빙 승인 및 반려
-- 공고 승인·반려·마감
-- 최종 매칭
-- 출결 정정
-- 담당자 대리 접수와 대시보드
+`/api/admin/**`는 `CENTER_ADMIN` JWT가 필요하다. 예외적으로 최초 담당자 발급 API는 별도 provisioning key가 설정된 동안만 열리며, 운영 기본값은 비활성화다. 관리자 기능은 사업참여·교육·농가 심사, 증빙 다운로드, 공고 심사·매칭, 근무 정정, 대리 접수와 대시보드를 포함한다.
 
 ## 5. 핵심 구현 흐름
 

@@ -4,11 +4,11 @@ import chungbuk.cityfarmerplus.admin.work.dto.AttendanceCorrectionRequest;
 import chungbuk.cityfarmerplus.admin.work.dto.WorkAssignmentCorrectionResponse;
 import chungbuk.cityfarmerplus.admin.work.service.AdminWorkAssignmentService;
 import chungbuk.cityfarmerplus.common.web.AuthenticatedUser;
+import chungbuk.cityfarmerplus.common.web.PageResponse;
 import chungbuk.cityfarmerplus.work.dto.WorkAssignmentResponse;
 import chungbuk.cityfarmerplus.work.entity.WorkAssignment;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -32,15 +32,18 @@ public class AdminWorkAssignmentController {
     private final AdminWorkAssignmentService workAssignmentService;
 
     @GetMapping
-    public ResponseEntity<Page<WorkAssignmentResponse>> list(
+    public ResponseEntity<PageResponse<WorkAssignmentResponse>> list(
             Authentication authentication,
             @RequestParam(required = false) WorkAssignment.WorkStatus status,
             Pageable pageable
     ) {
-        return ResponseEntity.ok(workAssignmentService.list(
-                AuthenticatedUser.id(authentication),
-                status,
-                pageable
+        return ResponseEntity.ok(PageResponse.from(
+                workAssignmentService.list(
+                        AuthenticatedUser.id(authentication),
+                        status,
+                        pageable
+                ),
+                response -> response
         ));
     }
 

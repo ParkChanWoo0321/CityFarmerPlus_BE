@@ -117,6 +117,9 @@ public class AdminJobPostingService {
                 postingId,
                 JobApplication.ApplicationStatus.MATCHED
         );
+        if (matchedCount > 0) {
+            throw JobPostingException.matchedPostingUpdateNotAllowed();
+        }
         if (request.capacity() < matchedCount) {
             throw JobPostingException.capacityBelowMatchedCount();
         }
@@ -147,6 +150,11 @@ public class AdminJobPostingService {
         } catch (IllegalStateException exception) {
             throw JobPostingException.invalidState(exception.getMessage());
         }
+        jobApplicationRepository.findByJobPostingIdAndStatus(
+                        postingId,
+                        JobApplication.ApplicationStatus.APPLIED
+                )
+                .forEach(JobApplication::markNotMatched);
         JobPostingReview review = jobPostingReviewRepository.save(
                 JobPostingReview.record(
                         posting,

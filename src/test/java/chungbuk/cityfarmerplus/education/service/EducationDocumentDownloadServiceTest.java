@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -130,6 +131,39 @@ class EducationDocumentDownloadServiceTest {
         )).isInstanceOf(DomainException.class)
                 .extracting("code")
                 .isEqualTo("EDUCATION_DOCUMENT_FILE_UNAVAILABLE");
+    }
+
+    @Test
+    void adminDownloadsDocumentForReviewEvenAfterOwnerWithdrawal() {
+        User withdrawn = urbanFarmer();
+        withdrawn.withdraw();
+        EducationCertificateDocument document = document(withdrawn);
+        ByteArrayResource resource = new ByteArrayResource("proof".getBytes());
+        when(documentRepository.findByIdAndSubmissionId(DOCUMENT_ID, SUBMISSION_ID))
+                .thenReturn(Optional.of(document));
+        when(fileStorage.load("education/key-1")).thenReturn(resource);
+
+        EducationDocumentDownloadService.DownloadedEducationDocument downloaded =
+                service().downloadForAdmin(SUBMISSION_ID, DOCUMENT_ID);
+
+        assertThat(downloaded.resource()).isSameAs(resource);
+        assertThat(downloaded.originalFilename()).isEqualTo("이수증.pdf");
+        verifyNoInteractions(accessService);
+    }
+
+    @Test
+    void adminCannotDownloadDocumentFromAnotherSubmission() {
+        when(documentRepository.findByIdAndSubmissionId(DOCUMENT_ID, SUBMISSION_ID))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service().downloadForAdmin(
+                SUBMISSION_ID,
+                DOCUMENT_ID
+        )).isInstanceOf(DomainException.class)
+                .extracting("code")
+                .isEqualTo("EDUCATION_DOCUMENT_NOT_FOUND");
+
+        verifyNoInteractions(accessService, fileStorage);
     }
 
     private EducationDocumentDownloadService service() {

@@ -136,6 +136,24 @@ public interface WorkAssignmentRepository extends JpaRepository<WorkAssignment, 
             @Param("endTime") LocalTime endTime
     );
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select assignment
+            from WorkAssignment assignment
+            where assignment.urbanFarmer.id = :urbanFarmerId
+              and assignment.workDate = :workDate
+              and assignment.status <> chungbuk.cityfarmerplus.work.entity.WorkAssignment.WorkStatus.CANCELLED
+              and assignment.startTime < :endTime
+              and assignment.endTime > :startTime
+            order by assignment.id
+            """)
+    List<WorkAssignment> findOverlappingAssignmentsForUpdate(
+            @Param("urbanFarmerId") Long urbanFarmerId,
+            @Param("workDate") LocalDate workDate,
+            @Param("startTime") LocalTime startTime,
+            @Param("endTime") LocalTime endTime
+    );
+
     long countByStatus(WorkAssignment.WorkStatus status);
 
     @Query("""

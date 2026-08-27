@@ -60,6 +60,9 @@ public class EducationCertificateSubmission {
     @Column(name = "course_title_snapshot", nullable = false, length = 150, updatable = false)
     private String courseTitleSnapshot;
 
+    @Column(name = "required_hours_snapshot", nullable = false, updatable = false)
+    private int requiredHoursSnapshot;
+
     @Column(name = "attempt_number", nullable = false, updatable = false)
     private int attemptNumber;
 
@@ -119,6 +122,7 @@ public class EducationCertificateSubmission {
         submission.certification = certification;
         submission.course = course;
         submission.courseTitleSnapshot = course.getTitle();
+        submission.requiredHoursSnapshot = course.getRequiredHours();
         submission.attemptNumber = attemptNumber;
         submission.completionDate = completionDate;
         submission.completionHours = completionHours;
@@ -146,7 +150,7 @@ public class EducationCertificateSubmission {
 
     public void approve(User reviewer, int recognizedHours, Instant now) {
         validatePendingReviewer(reviewer);
-        int minimumHours = Math.max(8, course.getRequiredHours());
+        int minimumHours = Math.max(8, requiredHoursSnapshot);
         if (recognizedHours < minimumHours || recognizedHours > completionHours) {
             throw new IllegalArgumentException(
                     "인정 교육 시간은 과정 필수 시간 이상이며 제출한 이수 시간을 초과할 수 없습니다."

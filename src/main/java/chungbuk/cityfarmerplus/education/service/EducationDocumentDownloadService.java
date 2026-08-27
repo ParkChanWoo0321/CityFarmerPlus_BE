@@ -34,11 +34,25 @@ public class EducationDocumentDownloadService {
                         userId
                 )
                 .orElseThrow(this::notFound);
-        return load(document);
+        return load(document, true);
     }
 
-    private DownloadedEducationDocument load(EducationCertificateDocument document) {
-        if (!document.getSubmission()
+    @Transactional(readOnly = true)
+    public DownloadedEducationDocument downloadForAdmin(
+            Long submissionId,
+            Long documentId
+    ) {
+        EducationCertificateDocument document = documentRepository
+                .findByIdAndSubmissionId(documentId, submissionId)
+                .orElseThrow(this::notFound);
+        return load(document, false);
+    }
+
+    private DownloadedEducationDocument load(
+            EducationCertificateDocument document,
+            boolean activeOwnerRequired
+    ) {
+        if (activeOwnerRequired && !document.getSubmission()
                 .getCertification()
                 .getUrbanFarmer()
                 .isActive()) {

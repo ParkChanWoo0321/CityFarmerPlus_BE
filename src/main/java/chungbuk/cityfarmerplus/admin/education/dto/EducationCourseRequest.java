@@ -1,6 +1,7 @@
 package chungbuk.cityfarmerplus.admin.education.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public record EducationCourseRequest(
@@ -15,6 +16,10 @@ public record EducationCourseRequest(
         int requiredHours,
 
         @Size(max = 500, message = "외부 신청 URL은 500자 이하여야 합니다.")
+        @Pattern(
+                regexp = "^$|^https://[^\\s]+$",
+                message = "외부 신청 URL은 https 주소여야 합니다."
+        )
         String externalApplicationUrl,
 
         boolean mandatory,

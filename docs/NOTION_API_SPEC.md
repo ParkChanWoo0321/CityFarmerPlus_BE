@@ -1,11 +1,11 @@
-# CityFarmerPlus backend-1 API 명세
+# CityFarmerPlus 사용자 API 요약 명세
 
 - 기준일: 2026-08-26
-- 실제 HTTP 작업 수: 66개
+- 사용자 HTTP 작업 수: 66개 (전체 110개 중 관리자 42개와 health 2개는 `API_SPEC_INDEX.md`의 별도 명세 참조)
 - 기준 코드: 현재 Controller·DTO·Security·Service
 - 상세 필드·오류·상태 규칙: [FULL_API_SPEC.md](FULL_API_SPEC.md)
 
-이 문서는 노션에 바로 복사할 수 있는 현재 backend-1 API 목록이다. 구현 예정 API를 현재 기능처럼 적지 않는다.
+이 문서는 노션에 바로 복사할 수 있는 현재 사용자 API 목록이다. 관리자 기능도 현재 구현돼 있으며 `API_SPEC_INDEX.md`가 연결하는 8개 `ADMIN_*_API_SPEC.md`를 함께 사용한다.
 
 ---
 
@@ -57,7 +57,7 @@ JSON 오류 형식:
 | `FARM` | 농가 | 가능 |
 | `CENTER_ADMIN` | backend-2 담당자 공통 역할 | 불가능 |
 
-한 계정은 하나의 역할만 가진다. `CENTER_ADMIN`과 심사 상태·심사자 필드는 backend-2 병합을 위한 공통 계약으로 남아 있지만, backend-1에는 담당자 계정 발급이나 담당자 업무 처리 HTTP API가 없다.
+한 계정은 하나의 역할만 가진다. `CENTER_ADMIN` 발급과 담당자 업무 API는 사용자 API와 분리되어 있으며 관리자 전용 명세를 따른다.
 
 ## 3. 현재 API 수
 
@@ -144,7 +144,7 @@ JSON 오류 형식:
 | 심사 제출 | `POST` | `/api/urban-farmers/me/participation-applications/{applicationId}/submit` | `URBAN_FARMER` | `200` |
 | 신청 취소 | `POST` | `/api/urban-farmers/me/participation-applications/{applicationId}/cancel` | `URBAN_FARMER` | `200` |
 
-상태는 `DRAFT`, `SUBMITTED`, `APPROVED`, `REJECTED`, `CANCELLED`다. backend-1 사용자는 `SUBMITTED`까지 만들 수 있으며 승인·반려 전이는 backend-2 공통 계약이다.
+상태는 `DRAFT`, `SUBMITTED`, `APPROVED`, `REJECTED`, `CANCELLED`다. 사용자는 `SUBMITTED`까지 만들고, 승인·반려는 CENTER_ADMIN API가 처리한다.
 
 ## 디자인용 통합 신청 폼 — 3개
 
@@ -171,7 +171,7 @@ JSON 오류 형식:
 | 제출 상세 | `GET` | `/api/urban-farmers/me/education-certification/submissions/{submissionId}` | `URBAN_FARMER` | `200` |
 | 내 파일 다운로드 | `GET` | `/api/urban-farmers/me/education-certification/submissions/{submissionId}/documents/{documentId}` | `URBAN_FARMER` | `200` |
 
-제출은 `multipart/form-data`이며 `request` JSON과 `documents` 1~5개를 보낸다. 활성 필수 과정이 한 개 이상 존재하고 각 과정의 최신 제출이 모두 `APPROVED`여야 공고 지원이 가능하다. backend-1에는 교육 심사 API가 없다.
+제출은 `multipart/form-data`이며 `request` JSON과 `documents` 1~5개를 보낸다. 활성 필수 과정이 한 개 이상 존재하고 각 과정의 최신 제출이 모두 `APPROVED`여야 공고 지원이 가능하다. 교육 심사와 관리자 증빙 다운로드는 관리자 전용 명세를 따른다.
 
 ---
 
@@ -187,7 +187,7 @@ JSON 오류 형식:
 | 증빙 제출 | `POST` | `/api/farm-profiles/me/ownership-submissions` | `FARM` | `201` |
 | 본인 문서 다운로드 | `GET` | `/api/farm-ownership-documents/{documentId}/file` | `FARM` 소유자 | `200` |
 
-농가 프로필에는 농가명, 대표자명, 연락처, 주소, 시·군, 작물, 주요 활동, 사업자번호, 농지 면적이 필요하다. 증빙 제출 시 프로필과 제출 건이 `PENDING_REVIEW`가 되며, 반려 후 재제출은 과거 파일을 유지한 새 회차다. backend-1에는 농가 심사 API가 없다.
+농가 프로필에는 농가명, 대표자명, 연락처, 주소, 시·군, 작물, 주요 활동, 사업자번호, 농지 면적이 필요하다. 증빙 제출 시 프로필과 제출 건이 `PENDING_REVIEW`가 되며, 반려 후 재제출은 과거 파일을 유지한 새 회차다. 심사와 관리자 증빙 다운로드는 관리자 전용 명세를 따른다.
 
 ---
 
@@ -211,7 +211,7 @@ JSON 오류 형식:
 
 AI는 현재 외부 LLM이 아닌 규칙 기반 미리보기다. 공개 목록은 keyword, region, crop, 날짜 범위, workType, recruitmentStatus를 지원한다. 공개 응답에는 화면 상태 `recruitmentStatus`, 실제 접수 가능 여부 `acceptingApplications`, 현재 사용자의 지원 요약 `myApplication`이 포함된다. 익명 요청에서는 `myApplication`이 `null`이고, 유효한 JWT를 보내면 해당 사용자의 지원 정보로 개인화된다. `includeClosed=true` 상세는 이전에 승인·공개된 마감 공고만 허용한다.
 
-공고 상태는 `DRAFT`, `PENDING_REVIEW`, `OPEN`, `CLOSED`, `CANCELLED`, `WORK_COMPLETED`이며 backend-1에는 공고 승인·반려·강제 마감 API가 없다.
+공고 상태는 `DRAFT`, `PENDING_REVIEW`, `OPEN`, `CLOSED`, `CANCELLED`, `WORK_COMPLETED`이며 승인·반려·강제 마감은 CENTER_ADMIN API가 처리한다.
 
 ---
 
@@ -226,7 +226,7 @@ AI는 현재 외부 LLM이 아닌 규칙 기반 미리보기다. 공개 목록�
 | 농가 지원자 목록 | `GET` | `/api/farm/job-postings/{postingId}/applications` | 승인된 `FARM` 소유자 | `200` |
 | 농가 의견 등록·수정 | `PATCH` | `/api/farm/job-postings/{postingId}/applications/{applicationId}/opinion` | 승인된 `FARM` 소유자 | `200` |
 
-도시농부는 같은 시간대 여러 공고에 지원할 수 있다. 지원 시 지역·요일·희망 시작일·희망 종료일·가능 작업 유형·이동 가능 여부·경험 횟수를 스냅샷으로 저장하며 재지원 시 최신 값으로 갱신한다. 농가 의견은 `NONE`, `PREFERRED`, `NOT_PREFERRED`이며 최종 수락·거절이 아니다. `MATCHED`, `NOT_MATCHED` 상태는 공통 모델에 남아 있지만 backend-1에는 최종 매칭 API가 없다.
+도시농부는 같은 시간대 여러 공고에 지원할 수 있다. 지원 시 지역·요일·희망 시작일·희망 종료일·가능 작업 유형·이동 가능 여부·경험 횟수를 스냅샷으로 저장하며 재지원 시 최신 값으로 갱신한다. 농가 의견은 `NONE`, `PREFERRED`, `NOT_PREFERRED`이며 최종 수락·거절이 아니다. `MATCHED`, `NOT_MATCHED`는 CENTER_ADMIN 최종 매칭 API가 결정한다.
 
 ---
 
@@ -243,7 +243,7 @@ AI는 현재 외부 LLM이 아닌 규칙 기반 미리보기다. 공개 목록�
 
 도시농부 근무 목록은 `view=ALL|UPCOMING|PAST`를 받으며 기본값은 `ALL`이다. `UPCOMING`은 서울 시간 기준 종료 전인 `SCHEDULED` 근무를 가까운 순으로, `PAST`는 완료·결근·취소 또는 종료 지난 예정 근무를 최신 순으로 반환한다. 종료 시각과 현재 시각이 같으면 `PAST`다.
 
-출결은 작업 시작 후 `PRESENT` 또는 `ABSENT`로 최초 등록한다. 같은 농가 소유자가 이미 등록된 것과 같은 값을 다시 `PUT`하면 상태를 변경하지 않고 `200`과 현재 배정을 반환한다. 다른 값으로의 변경은 `409`다. 근무 완료는 종료 시각 이후 `PRESENT` 상태에서 농가가 확정한다. 출결 정정 상태와 이력 엔티티는 공통 계약이지만 backend-1에는 정정 API가 없다.
+출결은 작업 시작 후 `PRESENT` 또는 `ABSENT`로 최초 등록한다. 같은 농가 소유자가 이미 등록된 것과 같은 값을 다시 `PUT`하면 상태를 변경하지 않고 `200`과 현재 배정을 반환한다. 다른 값으로의 변경은 `409`다. 근무 완료는 종료 시각 이후 `PRESENT` 상태에서 농가가 확정한다. 이후 정정은 CENTER_ADMIN API가 이력과 함께 처리한다.
 
 ---
 
@@ -282,17 +282,9 @@ AI 상담도 현재 규칙 기반이며 확정되지 않은 행정 답변에는 
 - 반려 후 재제출 시 과거 회차와 파일 메타데이터 보존
 - 회원 탈퇴 시 실제 파일 삭제 작업 등록 및 실패 재시도
 
-## 5. backend-2 병합 경계
+## 5. 관리자 API 연결
 
-다음 상태와 필드는 현재 응답·DB 공통 계약에 존재하지만 backend-1에서 처리하는 HTTP API는 없다.
-
-- `CENTER_ADMIN`
-- 승인·반려와 심사자·심사 시각·반려 사유
-- 공고 승인·반려·마감 이력
-- 최종 매칭과 확정 담당자
-- 출결 정정과 정정 이력
-
-backend-1 단독 실행에서는 제출을 `PENDING_REVIEW`로 만들 수 있지만 이후 심사, 공고를 `OPEN`으로 만드는 처리, 최종 매칭, 출결 정정을 완료할 수 없다.
+현재 통합 코드에는 CENTER_ADMIN 계정 발급, 승인·반려, 과정 관리, 공고 심사·최종 매칭, 출결 정정, 대리 접수와 대시보드가 구현돼 있다. 이 사용자 요약에는 관리자 요청/응답을 중복 기재하지 않으며 `API_SPEC_INDEX.md`의 8개 관리자 전용 명세를 정본으로 사용한다.
 
 ## 6. 제외 범위
 

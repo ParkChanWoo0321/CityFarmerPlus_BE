@@ -62,7 +62,8 @@ public class AdminWorkAssignmentService {
         WorkAssignment.WorkStatus newWorkStatus = assignment.getStatus();
         WorkAssignment.AttendanceStatus newAttendanceStatus = assignment.getAttendanceStatus();
 
-        if (newWorkStatus == WorkAssignment.WorkStatus.SCHEDULED) {
+        if (newWorkStatus == WorkAssignment.WorkStatus.SCHEDULED
+                || previousWorkStatus == WorkAssignment.WorkStatus.COMPLETED) {
             JobPosting posting = jobPostingRepository
                     .findByIdForUpdate(assignment.getJobPostingId())
                     .orElseThrow(JobPostingException::notFound);
