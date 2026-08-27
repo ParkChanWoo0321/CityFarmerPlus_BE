@@ -83,6 +83,17 @@ Cloud Run은 `PORT`를 주입한다. 애플리케이션은 `0.0.0.0:${PORT}`에 
 
 backend-2를 처음 배포할 때는 백업 후 `gcp/migrations/20260827_backend2_tables.sql`을 외부 MySQL에 한 번 적용한다. 이 migration은 대리 접수 감사 로그와 출결 정정 이력 테이블을 생성한다. 두 테이블이 조회되는 것을 확인한 뒤에만 `JPA_DDL_AUTO=validate` revision을 배포한다.
 
+Cloud Shell에서는 다음 전용 runner를 사용한다. 이 스크립트는 Secret Manager 값을 출력하지 않고 읽으며, DB read-only preflight → 전체 DB gzip dump → SHA-256 생성 → 비공개 GCS bucket 업로드·존재 확인 → migration 적용 → 신규 컬럼·테이블·인덱스·FK·NULL 검증 순서로 실행한다. 백업이 생성·업로드되지 않으면 migration을 시작하지 않는다.
+
+```bash
+git clone --depth 1 --branch develop \
+  https://github.com/ParkChanWoo0321/CityFarmerPlus_BE.git
+cd CityFarmerPlus_BE
+bash gcp/migrate-backend2.sh
+```
+
+성공 출력의 GCS 백업 URI와 SHA-256을 배포 기록에 보관한다. 과거 교육 제출의 당시 필수 시간은 기존 DB에 별도로 보존되지 않았으므로, `required_hours_snapshot`은 migration 실행 시점의 해당 과정 필수 시간으로 백필된다.
+
 로컬 PC에 `gcloud`가 없다면 무료 Cloud Shell에서 아래 명령을 실행할 수 있다.
 
 ```bash
