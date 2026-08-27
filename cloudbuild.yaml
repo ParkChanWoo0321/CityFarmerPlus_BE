@@ -158,7 +158,7 @@ steps:
             --quiet || true
           exit 1
         fi
-        if ! bash gcp/smoke-public.sh "$$CANDIDATE_URL"; then
+        if ! bash gcp/smoke-public.sh "$$CANDIDATE_URL" "${_CORS_SMOKE_ORIGIN}"; then
           gcloud run services update-traffic "${_SERVICE}" \
             --project="$PROJECT_ID" \
             --region="${_REGION}" \
@@ -278,7 +278,7 @@ steps:
           --region="${_REGION}" \
           --to-revisions="$$CANDIDATE_REVISION=100" \
           --quiet
-        bash gcp/smoke-public.sh "$$SERVICE_URL"
+        bash gcp/smoke-public.sh "$$SERVICE_URL" "${_CORS_SMOKE_ORIGIN}"
         TRAFFIC_SWITCHED=false
         trap - ERR INT TERM
         gcloud run services update-traffic "${_SERVICE}" \
@@ -294,7 +294,8 @@ substitutions:
   _SERVICE: cityfarmerplus-api
   _TAG: bootstrap
   _DEPLOY: "false"
-  _CORS_ALLOWED_ORIGINS: "https://cityfarmerplus.site,https://www.cityfarmerplus.site,http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000"
+  _CORS_ALLOWED_ORIGINS: "https://chungbuk-farmer.vercel.app,https://cityfarmerplus.site,https://www.cityfarmerplus.site,http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000"
+  _CORS_SMOKE_ORIGIN: "https://chungbuk-farmer.vercel.app"
 
 options:
   logging: CLOUD_LOGGING_ONLY

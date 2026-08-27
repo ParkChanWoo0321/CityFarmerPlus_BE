@@ -13,7 +13,8 @@ BUILD_SA_RESOURCE="projects/${PROJECT_ID}/serviceAccounts/${BUILD_SA}"
 GCS_BUCKET="${PROJECT_ID}-cityfarmerplus-private"
 BUILD_SOURCE_BUCKET="${PROJECT_ID}-cityfarmerplus-build-source"
 JWT_ISSUER="${JWT_ISSUER:?Set JWT_ISSUER explicitly to the current production issuer.}"
-CORS_ALLOWED_ORIGINS="${CORS_ALLOWED_ORIGINS:-https://cityfarmerplus.site,https://www.cityfarmerplus.site,http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000}"
+CORS_ALLOWED_ORIGINS="${CORS_ALLOWED_ORIGINS:-https://chungbuk-farmer.vercel.app,https://cityfarmerplus.site,https://www.cityfarmerplus.site,http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000}"
+CORS_SMOKE_ORIGIN="${CORS_SMOKE_ORIGIN:-https://chungbuk-farmer.vercel.app}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 
@@ -239,7 +240,7 @@ if [[ -z "${CANDIDATE_REVISION}" || -z "${CANDIDATE_URL}" ]]; then
   exit 1
 fi
 
-if ! bash "${SCRIPT_DIR}/smoke-public.sh" "${CANDIDATE_URL}"; then
+if ! bash "${SCRIPT_DIR}/smoke-public.sh" "${CANDIDATE_URL}" "${CORS_SMOKE_ORIGIN}"; then
   gcloud run services update-traffic "${SERVICE}" \
     --project="${PROJECT_ID}" \
     --region="${REGION}" \
@@ -367,7 +368,7 @@ gcloud run services update-traffic "${SERVICE}" \
   --to-revisions="${CANDIDATE_REVISION}=100" \
   --quiet
 
-bash "${SCRIPT_DIR}/smoke-public.sh" "${SERVICE_URL}"
+bash "${SCRIPT_DIR}/smoke-public.sh" "${SERVICE_URL}" "${CORS_SMOKE_ORIGIN}"
 TRAFFIC_SWITCHED=false
 trap - ERR INT TERM
 gcloud run services update-traffic "${SERVICE}" \

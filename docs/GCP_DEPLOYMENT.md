@@ -64,6 +64,7 @@ Cloud Run은 `PORT`를 주입한다. 애플리케이션은 `0.0.0.0:${PORT}`에 
 | `EDUCATION_PROGRESS_WEBHOOK_TOLERANCE` | Cloud Run env | 서명 시각 허용 오차. 기본 `5m` |
 | `JWT_ISSUER` | Cloud Run env | 고정 issuer. 예: `urn:cityfarmerplus:api` |
 | `CORS_ALLOWED_ORIGINS` | Cloud Run env | 실제 프론트 Origin 목록 |
+| `CORS_SMOKE_ORIGIN` | 배포 스크립트/Cloud Build substitution | 배포 전후 preflight를 검증할 대표 프론트 Origin |
 | `FILE_STORAGE_TYPE` | Cloud Run env | `gcs` |
 | `GCS_PROJECT_ID` | Cloud Run env | GCP 프로젝트 ID |
 | `GCS_BUCKET` | Cloud Run env | 비공개 bucket 이름 |
@@ -475,7 +476,8 @@ Cloud Build trigger는 GCP Console에서 다음 값으로 만든다.
 | `_SERVICE` | `cityfarmerplus-api` |
 | `_TAG` | `$SHORT_SHA` |
 | `_DEPLOY` | `true` |
-| `_CORS_ALLOWED_ORIGINS` | `https://cityfarmerplus.site,https://www.cityfarmerplus.site`와 필요한 로컬 개발 Origin 목록 |
+| `_CORS_ALLOWED_ORIGINS` | `https://chungbuk-farmer.vercel.app,https://cityfarmerplus.site,https://www.cityfarmerplus.site`와 필요한 로컬 개발 Origin 목록 |
+| `_CORS_SMOKE_ORIGIN` | `https://chungbuk-farmer.vercel.app` |
 
 Trigger 위치와 배포 위치는 서로 다르다. Trigger는 별도 private pool이 필요 없는 `global` 기본 pool에서 실행하고, `_REGION=us-west1`을 통해 Artifact Registry와 Cloud Run은 `us-west1`에 배포한다.
 
@@ -487,20 +489,21 @@ trigger가 사용하는 build 서비스 계정은 6절에서 만든 전용 계�
 - Cloud Build Editor
 - 런타임 서비스 계정에 대한 Service Account User
 
-GitHub 연결과 IAM 변경을 마친 뒤 `main` push로 한 번 실행하고, 테스트·이미지 push·candidate smoke·트래픽 전환이 모두 성공했는지 확인한다. `_CORS_ALLOWED_ORIGINS`는 경로가 없는 정확한 Origin만 넣으며, 삭제된 프론트 주소를 남겨 두지 않는다.
+GitHub 연결과 IAM 변경을 마친 뒤 `main` push로 한 번 실행하고, 테스트·이미지 push·candidate smoke·트래픽 전환이 모두 성공했는지 확인한다. `_CORS_ALLOWED_ORIGINS`는 경로가 없는 정확한 Origin만 넣으며, 삭제된 프론트 주소를 남겨 두지 않는다. `_CORS_SMOKE_ORIGIN`은 실제 배포된 프론트 중 하나로 지정하며, candidate와 트래픽 전환 후 서비스에서 해당 Origin의 preflight가 모두 성공해야 배포가 완료된다.
 
 ## 10. 운영 Smoke Test
 
 운영 배포를 완료한 뒤 다음을 모두 통과해야 한다.
 
 1. `GET /health`가 `200`과 `{ "status": "UP", "database": "UP" }`을 반환한다.
-2. 회원가입·로그인·JWT 인증 요청이 성공한다.
-3. DB 쓰기 후 다시 조회해 외부 MySQL 연결을 확인한다.
-4. 교육 또는 농가 증빙 파일을 업로드하고 다운로드한다.
-5. 해당 파일이 비공개 GCS bucket의 `cityfarmerplus/prod` 아래에 생성된다.
-6. 새 revision 배포 또는 scale-to-zero 이후에도 파일을 다시 다운로드할 수 있다.
-7. 허용 Origin에는 CORS 헤더가 있고, 허용하지 않은 Origin에는 없다.
-8. 로그에 DB 비밀번호, JWT secret, access token이 노출되지 않는다.
+2. 실제 프론트 Origin에서 `OPTIONS /api/education/courses` preflight가 성공하고 동일한 `Access-Control-Allow-Origin`을 반환한다.
+3. 회원가입·로그인·JWT 인증 요청이 성공한다.
+4. DB 쓰기 후 다시 조회해 외부 MySQL 연결을 확인한다.
+5. 교육 또는 농가 증빙 파일을 업로드하고 다운로드한다.
+6. 해당 파일이 비공개 GCS bucket의 `cityfarmerplus/prod` 아래에 생성된다.
+7. 새 revision 배포 또는 scale-to-zero 이후에도 파일을 다시 다운로드할 수 있다.
+8. 허용 Origin에는 CORS 헤더가 있고, 허용하지 않은 Origin에는 없다.
+9. 로그에 DB 비밀번호, JWT secret, access token이 노출되지 않는다.
 9. 프론트엔드 API base URL을 새 `run.app` 주소로 바꾼다.
 
 KAMIS 조회는 `KAMIS_API_KEY`와 `KAMIS_CERT_ID`가 모두 필요하다. 애플리케이션은 HTTPS client, timeout·1회 재시도, 1시간 캐시, 24시간 stale fallback과 공개 `/api/market-prices/latest` 계약을 제공한다. 배포 완료 판정에는 실제 인증쌍으로 이 API가 `200`, `provider=KAMIS`, 비어 있지 않은 `observedDate`를 반환하는 smoke test가 포함된다.
