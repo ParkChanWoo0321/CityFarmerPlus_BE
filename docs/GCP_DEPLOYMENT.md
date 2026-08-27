@@ -298,7 +298,7 @@ export JWT_ISSUER="urn:cityfarmerplus:api"
 bash gcp/deploy.sh
 ```
 
-여섯 Secret version과 `JWT_ISSUER`를 모두 명시해야 한다. 스크립트는 각 숫자 version이 `ENABLED`인지 확인하고 Cloud Run에 숫자로 고정한다. 새 revision은 commit과 실행 시각을 포함한 고유 candidate 태그와 0% 트래픽으로 먼저 배포하고 `/health`와 KAMIS를 통과한 뒤에만 100% 트래픽으로 전환한다. 빌드 중 `origin/main`이 바뀌면 전환하지 않으며, 안정 URL 검증 또는 전환 이후 명령이 실패하거나 실행이 중단되면 직전 100% revision으로 자동 롤백한다. 회원가입·로그인, 인증 조회, DB 쓰기·재조회와 파일 검증까지 성공한 뒤에만 구 Secret version을 비활성화한다.
+여섯 Secret version과 `JWT_ISSUER`를 모두 명시해야 한다. 스크립트는 각 숫자 version이 `ENABLED`인지 확인하고 Cloud Run에 숫자로 고정한다. 새 revision은 commit과 실행별 nonce를 포함하며 Cloud Run 길이 제한을 지키는 고유 candidate 태그와 0% 트래픽으로 먼저 배포하고 `/health`와 KAMIS를 통과한 뒤에만 100% 트래픽으로 전환한다. 빌드 중 `origin/main`이 바뀌면 전환하지 않으며, 안정 URL 검증 또는 전환 이후 명령이 실패하거나 실행이 중단되면 직전 100% revision으로 자동 롤백한다. 회원가입·로그인, 인증 조회, DB 쓰기·재조회와 파일 검증까지 성공한 뒤에만 구 Secret version을 비활성화한다.
 
 DB 회전 전에는 직전 revision 이름, 여섯 Secret version, `JWT_ISSUER`를 배포 기록에 남긴다. 구 Aiven 사용자는 새 revision의 관찰 기간과 롤백 가능 기간이 모두 끝날 때까지 유지한다. Secret version을 먼저 비활성화했다가 롤백해야 한다면 해당 숫자 version을 다시 enable한 뒤 직전 revision으로 트래픽을 되돌린다.
 
