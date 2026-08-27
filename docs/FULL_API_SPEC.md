@@ -560,7 +560,8 @@ JobPostingUpsertRequest:
 | 희망 지원자 조건 수정 | PATCH | /api/farm/job-postings/{postingId}/applicant-preference | FARM 소유자 | applicantPreference | 200 |
 | 공고 취소 | POST | /api/farm/job-postings/{postingId}/cancel | FARM 소유자 | 없음 | 200 |
 
-- 공고 생성에는 승인된 농가 프로필이 필요하다.
+- 공고 생성·관리에는 활성 `FARM` 계정과 저장된 농가 프로필이 필요하다. 소유 증빙 심사 상태(`DRAFT`, `PENDING_REVIEW`, `APPROVED`, `REJECTED`)는 공고 사용 자격을 제한하지 않는다.
+- 농가 프로필 저장 직후 공고 초안을 작성하고 심사를 요청할 수 있지만, 공고는 기존과 동일하게 `CENTER_ADMIN`의 공고 승인을 받아 `OPEN`이 된 뒤 공개·지원 가능하다.
 - 농가는 DRAFT 공고 본문만 수정·삭제할 수 있다. 반려 결과가 연결된 DRAFT를 삭제하면 FK 정합성을 위해 해당 공고의 심사 이력을 먼저 함께 삭제한 뒤 공고를 삭제한다.
 - applicantPreference는 작업 시작 전 OPEN 상태에서만 수정할 수 있다.
 - MATCHED 또는 WORK_COMPLETED 지원자가 있으면 농가는 공고를 취소할 수 없다.
@@ -974,8 +975,6 @@ URBAN_FARMER 회원가입·로그인
 ~~~text
 FARM 회원가입·로그인
 → 농가 프로필 작성
-→ 소유 증빙 제출
-→ CENTER_ADMIN 심사로 APPROVED
 → AI 규칙 기반 공고 문구 미리보기
 → 공고 초안 생성·수정
 → 공고 심사 요청
@@ -985,6 +984,8 @@ FARM 회원가입·로그인
 → 출결 등록
 → 작업 종료 후 근무 완료 확정
 ~~~
+
+농가 소유 증빙 제출·심사는 위 공고 흐름과 독립적으로 사용할 수 있으며, 소유 증빙 승인 여부는 공고 작성·공개·지원·근무 관리의 선행 조건이 아니다.
 
 ### 14.3 관리자 업무
 

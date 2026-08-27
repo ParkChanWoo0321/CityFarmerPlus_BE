@@ -231,14 +231,11 @@ public final class JobPostingSpecifications {
         );
     }
 
-    public static Specification<JobPosting> hasActiveApprovedFarm() {
-        return (root, query, builder) -> builder.and(
-                builder.equal(root.get("farmProfile").get("status"),
-                        chungbuk.cityfarmerplus.farm.entity.FarmProfile
-                                .FarmProfileStatus.APPROVED),
-                builder.equal(root.get("farmProfile").get("owner")
+    public static Specification<JobPosting> hasActiveFarmOwner() {
+        return (root, query, builder) -> builder.equal(
+                root.get("farmProfile").get("owner")
                         .get("accountStatus"),
-                        chungbuk.cityfarmerplus.auth.entity.User.AccountStatus.ACTIVE)
+                chungbuk.cityfarmerplus.auth.entity.User.AccountStatus.ACTIVE
         );
     }
 }

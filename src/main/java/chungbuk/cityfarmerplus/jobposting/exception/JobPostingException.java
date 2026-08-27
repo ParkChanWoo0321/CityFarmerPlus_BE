@@ -9,10 +9,6 @@ public class JobPostingException extends DomainException {
         super(status, code, message);
     }
 
-    public static JobPostingException farmApprovalRequired() {
-        return new JobPostingException(HttpStatus.FORBIDDEN, "FARM_APPROVAL_REQUIRED", "승인된 농가만 모집 공고를 관리할 수 있습니다.");
-    }
-
     public static JobPostingException notFound() {
         return new JobPostingException(HttpStatus.NOT_FOUND, "JOB_POSTING_NOT_FOUND", "모집 공고를 찾을 수 없습니다.");
     }

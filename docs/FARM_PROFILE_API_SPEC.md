@@ -17,6 +17,7 @@
 - 신규 농가 프로필은 항상 `DRAFT` 상태로 생성된다.
 - `users.account_status=ACTIVE`는 로그인이 가능한 계정이라는 의미다.
 - `farm_profiles.status=APPROVED`는 중개센터 심사 결과로 농가 소유가 승인되었다는 의미다.
+- 농가 소유 심사 상태는 공고 기능의 자격 조건이 아니다. 활성 `FARM` 계정이 프로필을 저장하면 상태가 `DRAFT`여도 공고 초안을 작성하고 심사를 요청할 수 있다.
 - 소유 증빙 제출은 `FARM_OWNERSHIP_SUBMISSION_API_SPEC.md`에서 별도로 정의한다.
 - `CENTER_ADMIN`은 통합된 담당자 API로 농가 소유 증빙을 조회하고 승인·반려할 수 있다.
 
@@ -278,4 +279,4 @@ DRAFT
 
 ## 10. 중개센터 심사 연동
 
-농가 심사 목록·상세·승인·반려와 담당자 증빙 다운로드 API가 `/api/admin/farm-profiles/**`에 통합돼 있다. 사용자 API는 같은 모델에 저장된 심사 결과를 조회하고 `APPROVED` 여부를 공고 작성 자격에 사용한다. 상세 계약은 `ADMIN_FARM_OWNERSHIP_API_SPEC.md`를 따른다.
+농가 심사 목록·상세·승인·반려와 담당자 증빙 다운로드 API가 `/api/admin/farm-profiles/**`에 통합돼 있다. 사용자 API는 같은 모델에 저장된 심사 결과를 조회하지만, `APPROVED` 여부를 공고 작성 자격에는 사용하지 않는다. 상세 계약은 `ADMIN_FARM_OWNERSHIP_API_SPEC.md`를 따른다.

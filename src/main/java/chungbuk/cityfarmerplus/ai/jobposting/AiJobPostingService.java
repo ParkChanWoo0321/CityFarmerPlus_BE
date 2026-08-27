@@ -18,7 +18,7 @@ public class AiJobPostingService {
             Long farmUserId,
             AiJobPostingPreviewRequest request
     ) {
-        accessService.requireApprovedFarm(farmUserId);
+        accessService.requireFarmProfile(farmUserId);
         scheduleValidator.validate(
                 request.workDate(),
                 request.startTime(),

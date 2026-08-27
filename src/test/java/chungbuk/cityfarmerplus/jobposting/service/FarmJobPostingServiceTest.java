@@ -66,8 +66,7 @@ class FarmJobPostingServiceTest {
     @Test
     void createsAndSubmitsPostingForReviewInOneTransactionFlow() {
         FarmProfile farm = org.mockito.Mockito.mock(FarmProfile.class);
-        when(farm.getStatus()).thenReturn(FarmProfile.FarmProfileStatus.APPROVED);
-        when(accessService.requireApprovedFarmForUpdate(1L)).thenReturn(farm);
+        when(accessService.requireFarmProfileForUpdate(1L)).thenReturn(farm);
         when(postingRepository.saveAndFlush(any(JobPosting.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         JobPostingResponse expected = org.mockito.Mockito.mock(JobPostingResponse.class);
@@ -106,7 +105,7 @@ class FarmJobPostingServiceTest {
 
         assertThat(response.content()).isEmpty();
         verify(accessService).requireFarmProfile(1L);
-        verify(accessService, never()).requireApprovedFarm(1L);
+        verify(accessService, never()).requireFarmProfileForUpdate(1L);
         ArgumentCaptor<Pageable> pageableCaptor =
                 ArgumentCaptor.forClass(Pageable.class);
         verify(postingRepository).findAll(

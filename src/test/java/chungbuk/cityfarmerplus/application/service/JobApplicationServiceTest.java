@@ -232,16 +232,12 @@ class JobApplicationServiceTest {
     private JobPosting openPosting() {
         JobPosting posting = mock(JobPosting.class);
         FarmProfile farm = mock(FarmProfile.class);
-        User farmOwner = mock(User.class);
         when(posting.isAcceptingApplications(
                 any(LocalDate.class),
                 any(LocalTime.class)
         )).thenReturn(true);
         when(posting.isVisibleToUrbanFarmers()).thenReturn(true);
         when(posting.getFarmProfile()).thenReturn(farm);
-        when(farm.getStatus()).thenReturn(FarmProfile.FarmProfileStatus.APPROVED);
-        when(farm.getOwner()).thenReturn(farmOwner);
-        when(farmOwner.isActive()).thenReturn(true);
         when(posting.getId()).thenReturn(POSTING_ID);
         when(posting.getWageUnit()).thenReturn(JobPosting.WageUnit.DAILY);
         return posting;

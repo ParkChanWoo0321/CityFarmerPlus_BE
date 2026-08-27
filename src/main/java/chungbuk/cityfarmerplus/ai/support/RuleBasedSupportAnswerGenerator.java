@@ -25,7 +25,7 @@ public class RuleBasedSupportAnswerGenerator implements SupportAnswerGenerator {
         if (isFarmPostingQuestion(normalized)) {
             return new SupportAnswer(
                     "농가 공고",
-                    "농가 소유 증빙 승인을 받은 뒤 작업 날짜·시간·인원·장소·인건비를 입력해 공고 초안을 만드세요. 담당자가 승인해야 공고가 공개됩니다.",
+                    "농가 프로필을 저장한 뒤 작업 날짜·시간·인원·장소·인건비를 입력해 공고 초안을 만드세요. 담당자가 공고를 승인해야 공개됩니다.",
                     false
             );
         }

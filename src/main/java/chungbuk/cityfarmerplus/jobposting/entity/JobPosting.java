@@ -127,9 +127,6 @@ public class JobPosting {
         if (farmProfile == null) {
             throw new IllegalArgumentException("농가 프로필은 필수입니다.");
         }
-        if (farmProfile.getStatus() != FarmProfile.FarmProfileStatus.APPROVED) {
-            throw new IllegalArgumentException("승인된 농가만 공고를 작성할 수 있습니다.");
-        }
         JobPosting posting = new JobPosting();
         posting.farmProfile = farmProfile;
         posting.apply(details);
@@ -227,7 +224,6 @@ public class JobPosting {
 
     public boolean isAcceptingApplications(LocalDate today, LocalTime now) {
         return isVisibleToUrbanFarmers()
-                && farmProfile.getStatus() == FarmProfile.FarmProfileStatus.APPROVED
                 && farmProfile.getOwner().isActive()
                 && (workDate.isAfter(today)
                 || workDate.isEqual(today) && startTime.isAfter(now));

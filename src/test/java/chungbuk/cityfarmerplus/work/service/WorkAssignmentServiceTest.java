@@ -91,7 +91,7 @@ class WorkAssignmentServiceTest {
                 Sort.Order.desc("startTime"),
                 Sort.Order.desc("id")
         ));
-        when(accessService.requireApprovedFarm(1L)).thenReturn(farm);
+        when(accessService.requireFarmProfile(1L)).thenReturn(farm);
         when(farm.getId()).thenReturn(5L);
         when(assignmentRepository.findByFarmProfileId(5L, pageable))
                 .thenReturn(Page.empty(pageable));
@@ -149,7 +149,7 @@ class WorkAssignmentServiceTest {
         WorkAssignment assignment = mock(WorkAssignment.class);
         JobPosting posting = mock(JobPosting.class);
 
-        when(accessService.requireApprovedFarmForUpdate(1L)).thenReturn(farm);
+        when(accessService.requireFarmProfileForUpdate(1L)).thenReturn(farm);
         when(farm.getId()).thenReturn(5L);
         when(assignmentRepository.findById(10L)).thenReturn(Optional.of(assignment));
         when(assignmentRepository.findByIdForUpdate(10L))
@@ -181,7 +181,7 @@ class WorkAssignmentServiceTest {
         User urbanFarmer = mock(User.class);
         User farmOwner = mock(User.class);
 
-        when(accessService.requireApprovedFarmForUpdate(1L)).thenReturn(farm);
+        when(accessService.requireFarmProfileForUpdate(1L)).thenReturn(farm);
         when(farm.getId()).thenReturn(5L);
         when(farm.getOwner()).thenReturn(farmOwner);
         when(assignmentRepository.findById(10L)).thenReturn(Optional.of(assignment));
@@ -223,7 +223,7 @@ class WorkAssignmentServiceTest {
         User urbanFarmer = mock(User.class);
         User farmOwner = mock(User.class);
 
-        when(accessService.requireApprovedFarmForUpdate(1L)).thenReturn(farm);
+        when(accessService.requireFarmProfileForUpdate(1L)).thenReturn(farm);
         when(farm.getId()).thenReturn(5L);
         when(farm.getOwner()).thenReturn(farmOwner);
         when(assignmentRepository.findById(10L)).thenReturn(Optional.of(assignment));
@@ -261,7 +261,7 @@ class WorkAssignmentServiceTest {
         JobPosting posting = mock(JobPosting.class);
         User farmOwner = mock(User.class);
 
-        when(accessService.requireApprovedFarmForUpdate(1L)).thenReturn(farm);
+        when(accessService.requireFarmProfileForUpdate(1L)).thenReturn(farm);
         when(farm.getId()).thenReturn(5L);
         when(farm.getOwner()).thenReturn(farmOwner);
         when(assignmentRepository.findById(10L)).thenReturn(Optional.of(assignment));
@@ -296,7 +296,7 @@ class WorkAssignmentServiceTest {
         WorkAssignment assignment = mock(WorkAssignment.class);
         JobPosting posting = mock(JobPosting.class);
 
-        when(accessService.requireApprovedFarmForUpdate(1L)).thenReturn(farm);
+        when(accessService.requireFarmProfileForUpdate(1L)).thenReturn(farm);
         when(farm.getId()).thenReturn(5L);
         when(assignmentRepository.findById(10L)).thenReturn(Optional.of(assignment));
         when(assignmentRepository.findByIdForUpdate(10L))
@@ -325,7 +325,7 @@ class WorkAssignmentServiceTest {
         AtomicReference<JobPosting.JobPostingStatus> postingStatus =
                 new AtomicReference<>(JobPosting.JobPostingStatus.OPEN);
 
-        when(accessService.requireApprovedFarmForUpdate(1L)).thenReturn(farm);
+        when(accessService.requireFarmProfileForUpdate(1L)).thenReturn(farm);
         when(farm.getId()).thenReturn(5L);
         when(assignmentRepository.findById(10L)).thenReturn(Optional.of(assignment));
         when(assignmentRepository.findByIdForUpdate(10L))

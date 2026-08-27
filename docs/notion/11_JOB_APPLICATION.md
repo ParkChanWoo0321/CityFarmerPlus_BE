@@ -226,7 +226,7 @@
 
 `GET /api/farm/job-postings/{postingId}/applications`
 
-- 권한: `FARM` + 승인된 농가
+- 권한: 활성 `FARM` + 저장된 농가 프로필
 - 자기 공고만 가능
 - 모든 상태의 지원을 `createdAt` 오름차순으로 반환
 
@@ -262,7 +262,7 @@
 - `preferredRegionsSnapshot`, `availableDaysSnapshot`, `availableWorkTypesSnapshot`은 쉼표로 연결한 지원 시점 문자열이다.
 - 희망 근무 조건이 없었던 지원은 희망 조건 스냅샷이 `null`일 수 있다. 경험 횟수는 프로필이 없으면 0이다.
 
-오류: `FARM_APPROVAL_REQUIRED`(403), `JOB_POSTING_NOT_FOUND`(404), `JOB_POSTING_NOT_OWNER`(403).
+오류: `FARM_PROFILE_NOT_FOUND`(404), `JOB_POSTING_NOT_FOUND`(404), `JOB_POSTING_NOT_OWNER`(403).
 
 ## 6. 농가 지원자 의견 수정
 

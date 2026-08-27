@@ -34,12 +34,13 @@ class JobPostingTest {
     }
 
     @Test
-    void onlyApprovedFarmCanCreatePosting() {
+    void savedFarmProfileCanCreatePostingBeforeOwnershipApproval() {
         FarmProfile draft = draftFarm();
 
-        assertThatThrownBy(() -> JobPosting.createDraft(draft, details()))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("승인된 농가");
+        JobPosting posting = JobPosting.createDraft(draft, details());
+
+        assertThat(posting.getFarmProfile()).isSameAs(draft);
+        assertThat(posting.getStatus()).isEqualTo(JobPosting.JobPostingStatus.DRAFT);
     }
 
     @Test
@@ -167,8 +168,8 @@ class JobPostingTest {
     }
 
     @Test
-    void acceptingApplicationsRequiresFutureStartAndActiveApprovedFarm() {
-        FarmProfile farm = approvedFarm();
+    void acceptingApplicationsRequiresFutureStartAndActiveFarmOwner() {
+        FarmProfile farm = draftFarm();
         JobPosting posting = JobPosting.createDraft(farm, details());
         posting.submitForReview(Instant.parse("2026-08-09T00:00:00Z"));
         posting.approve(Instant.parse("2026-08-09T00:10:00Z"));

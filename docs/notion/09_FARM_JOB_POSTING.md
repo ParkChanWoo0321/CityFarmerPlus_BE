@@ -13,8 +13,9 @@
 - Base URL: `{{baseUrl}}`
 - 모든 API에 JWT `Authorization: Bearer {{farmAccessToken}}` 필수
 - `FARM` 역할만 호출 가능
-- 목록·상세·심사 이력 조회는 활성 `FARM` 계정과 본인 농가 프로필만 있으면 가능
-- 생성·수정·삭제·심사 요청·취소는 농가 프로필이 `APPROVED`여야 함
+- 모든 공고 기능은 활성 `FARM` 계정과 본인 농가 프로필만 있으면 가능
+- 농가 소유 심사 상태는 공고 자격을 제한하지 않으며, 프로필 저장 직후 초안 작성과 심사 요청이 가능
+- 공고는 `CENTER_ADMIN`의 공고 승인을 받아 `OPEN`이 된 뒤 공개·지원 가능
 - 자기 농가가 작성한 공고만 조회·변경 가능
 - JSON 요청은 `Content-Type: application/json`
 - 시간 비교는 `Asia/Seoul` 기준
@@ -203,7 +204,7 @@
 }
 ```
 
-주요 오류: `VALIDATION_ERROR`(400), `INVALID_REQUEST`(400), `PAST_WORK_DATE`(400), `INVALID_JOB_POSTING_DETAILS`(400), `FARM_APPROVAL_REQUIRED`(403).
+주요 오류: `VALIDATION_ERROR`(400), `INVALID_REQUEST`(400), `PAST_WORK_DATE`(400), `INVALID_JOB_POSTING_DETAILS`(400), `FARM_PROFILE_NOT_FOUND`(404).
 
 ## 2. 내 공고 목록
 
@@ -620,7 +621,6 @@
 | 400 | `INVALID_JOB_POSTING_DETAILS` | 종료 시간 등 세부값 불일치 |
 | 401 | `UNAUTHORIZED`, `INVALID_ACCOUNT` | JWT 누락·무효, 현재 계정과 토큰 불일치 |
 | 403 | `ACCESS_DENIED` | `FARM` 역할이 아님 |
-| 403 | `FARM_APPROVAL_REQUIRED` | 농가 미승인 |
 | 403 | `JOB_POSTING_NOT_OWNER` | 다른 농가의 공고 |
 | 404 | `FARM_PROFILE_NOT_FOUND` | 계정에 연결된 농가 프로필이 없음 |
 | 404 | `JOB_POSTING_NOT_FOUND` | 공고 없음 |
