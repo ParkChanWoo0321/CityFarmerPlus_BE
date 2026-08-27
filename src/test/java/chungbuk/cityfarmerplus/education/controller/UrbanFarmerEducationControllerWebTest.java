@@ -3,10 +3,12 @@ package chungbuk.cityfarmerplus.education.controller;
 import chungbuk.cityfarmerplus.auth.config.SecurityConfig;
 import chungbuk.cityfarmerplus.auth.exception.GlobalExceptionHandler;
 import chungbuk.cityfarmerplus.education.dto.EducationCertificationResponse;
+import chungbuk.cityfarmerplus.education.dto.EducationCourseProgressResponse;
 import chungbuk.cityfarmerplus.education.dto.EducationDocumentResponse;
 import chungbuk.cityfarmerplus.education.dto.EducationSubmissionResponse;
 import chungbuk.cityfarmerplus.education.entity.EducationCertificateSubmission;
 import chungbuk.cityfarmerplus.education.entity.EducationCertification;
+import chungbuk.cityfarmerplus.education.progress.entity.EducationEnrollment;
 import chungbuk.cityfarmerplus.education.service.EducationDocumentDownloadService;
 import chungbuk.cityfarmerplus.education.service.EducationSubmissionService;
 import org.junit.jupiter.api.Test;
@@ -73,7 +75,12 @@ class UrbanFarmerEducationControllerWebTest {
                 .andExpect(jsonPath("$.urbanFarmerId").value(21))
                 .andExpect(jsonPath("$.status").value("PENDING_REVIEW"))
                 .andExpect(jsonPath("$.eligibleToApply").value(false))
-                .andExpect(jsonPath("$.requiredCourseCount").value(1));
+                .andExpect(jsonPath("$.requiredCourseCount").value(1))
+                .andExpect(jsonPath("$.courses[0].progressStatus")
+                        .value("IN_PROGRESS"))
+                .andExpect(jsonPath("$.courses[0].completedMinutes").value(240))
+                .andExpect(jsonPath("$.courses[0].remainingMinutes").value(240))
+                .andExpect(jsonPath("$.courses[0].progressPercentage").value(50));
 
         verify(submissionService).getCurrent(21L);
     }
@@ -250,7 +257,29 @@ class UrbanFarmerEducationControllerWebTest {
                 false,
                 1L,
                 0L,
-                List.of()
+                List.of(new EducationCourseProgressResponse(
+                        1L,
+                        "농업안전 기초",
+                        "필수 교육",
+                        8,
+                        "https://education.example.com/basic",
+                        true,
+                        EducationCertificateSubmission.SubmissionStatus.PENDING_REVIEW,
+                        100L,
+                        1,
+                        null,
+                        null,
+                        timestamp,
+                        EducationEnrollment.ProgressStatus.IN_PROGRESS,
+                        480,
+                        240,
+                        240,
+                        50,
+                        timestamp,
+                        null,
+                        timestamp,
+                        timestamp
+                ))
         );
     }
 

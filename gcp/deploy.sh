@@ -60,7 +60,8 @@ for required_version_variable in \
   CFP_DB_PASSWORD_VERSION \
   CFP_JWT_SECRET_VERSION \
   CFP_KAMIS_API_KEY_VERSION \
-  CFP_KAMIS_CERT_ID_VERSION; do
+  CFP_KAMIS_CERT_ID_VERSION \
+  CFP_EDUCATION_PROGRESS_WEBHOOK_SECRET_VERSION; do
   if [[ -z "${!required_version_variable:-}" ]]; then
     echo "${required_version_variable} must be set to an explicit numeric secret version." >&2
     exit 1
@@ -74,6 +75,7 @@ DB_PASSWORD_VERSION="$(resolve_enabled_version cityfarmerplus-db-password "${CFP
 JWT_SECRET_VERSION="$(resolve_enabled_version cityfarmerplus-jwt-secret "${CFP_JWT_SECRET_VERSION}")"
 KAMIS_API_KEY_VERSION="$(resolve_enabled_version cityfarmerplus-kamis-api-key "${CFP_KAMIS_API_KEY_VERSION}")"
 KAMIS_CERT_ID_VERSION="$(resolve_enabled_version cityfarmerplus-kamis-cert-id "${CFP_KAMIS_CERT_ID_VERSION}")"
+EDUCATION_PROGRESS_WEBHOOK_SECRET_VERSION="$(resolve_enabled_version cityfarmerplus-education-progress-webhook-secret "${CFP_EDUCATION_PROGRESS_WEBHOOK_SECRET_VERSION}")"
 
 COMMIT_SHA="$(git rev-parse HEAD)"
 SHORT_SHA="$(git rev-parse --short=7 HEAD)"
@@ -217,7 +219,7 @@ gcloud run deploy "${SERVICE}" \
   --no-traffic \
   --tag="${CANDIDATE_TAG}" \
   --env-vars-file="${ENV_FILE}" \
-  --set-secrets="DB_URL=cityfarmerplus-db-url:${DB_URL_VERSION},DB_USERNAME=cityfarmerplus-db-username:${DB_USERNAME_VERSION},DB_PASSWORD=cityfarmerplus-db-password:${DB_PASSWORD_VERSION},JWT_SECRET=cityfarmerplus-jwt-secret:${JWT_SECRET_VERSION},KAMIS_API_KEY=cityfarmerplus-kamis-api-key:${KAMIS_API_KEY_VERSION},KAMIS_CERT_ID=cityfarmerplus-kamis-cert-id:${KAMIS_CERT_ID_VERSION}" \
+  --set-secrets="DB_URL=cityfarmerplus-db-url:${DB_URL_VERSION},DB_USERNAME=cityfarmerplus-db-username:${DB_USERNAME_VERSION},DB_PASSWORD=cityfarmerplus-db-password:${DB_PASSWORD_VERSION},JWT_SECRET=cityfarmerplus-jwt-secret:${JWT_SECRET_VERSION},KAMIS_API_KEY=cityfarmerplus-kamis-api-key:${KAMIS_API_KEY_VERSION},KAMIS_CERT_ID=cityfarmerplus-kamis-cert-id:${KAMIS_CERT_ID_VERSION},EDUCATION_PROGRESS_WEBHOOK_SECRET=cityfarmerplus-education-progress-webhook-secret:${EDUCATION_PROGRESS_WEBHOOK_SECRET_VERSION}" \
   --startup-probe="httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=0,failureThreshold=24,timeoutSeconds=2,periodSeconds=10" \
   --liveness-probe="httpGet.path=/health/live,httpGet.port=8080,initialDelaySeconds=0,failureThreshold=3,timeoutSeconds=2,periodSeconds=30"
 

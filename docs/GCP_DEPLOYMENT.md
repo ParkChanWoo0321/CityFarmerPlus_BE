@@ -37,7 +37,7 @@ GCP 무료 한도를 사용하려면 활성 결제 계정이 필요하다. 결�
 - Cloud Storage bucket은 Always Free 대상인 `us-west1`에 만든다. Standard Storage 무료 한도는 월 5 GiB이며 세 개의 미국 무료 리전 사용량을 합산한다.
 - Cloud Build는 무료 대상인 기본 풀 `e2-standard-2`를 사용한다. 결제 계정당 월 2,500 build-minutes까지 무료다.
 - Artifact Registry에는 전용 repository 정리 정책을 적용해 최근 이미지 한 개만 남긴다. 무료 저장공간은 결제 계정당 0.5 GiB다.
-- Secret Manager는 DB/JWT/KAMIS용 여섯 개의 기본 활성 secret version을 유지한다. 무료 한도는 활성 version 6개와 월 10,000회 access이므로 회전 중 추가된 구 version은 검증 후 비활성화하고, 즉시 삭제하지 않아 롤백 여지는 남긴다.
+- Secret Manager는 DB/JWT/KAMIS/교육 진도 웹훅용 일곱 개의 기본 활성 secret version을 유지한다. [Google 공식 가격표](https://cloud.google.com/secret-manager/pricing)의 무료 활성 version은 결제 계정당 6개이므로 현재 구성에서는 자동 복제 기준 한 version 요금(대략 월 USD 0.06)과 무료 한도를 넘는 access가 과금될 수 있다. 회전 중 추가된 구 version은 검증 후 파기 일정을 정해 활성 version 수를 관리한다.
 - Cloud Scheduler의 `cityfarmerplus-db-keepalive` 작업 하나가 매시간 `/health`를 호출한다. 결제 계정당 월 3개 작업까지 무료이며 실행 횟수별 Scheduler 요금은 없지만, 호출로 발생하는 Cloud Run 사용량은 별도 집계된다.
 - Cloud SQL, Serverless VPC Access connector, 최소 인스턴스 1 이상은 만들지 않는다.
 - 외부 MySQL 제공자의 무료 한도와 만료 정책은 별도로 확인한다.
@@ -60,6 +60,8 @@ Cloud Run은 `PORT`를 주입한다. 애플리케이션은 `0.0.0.0:${PORT}`에 
 | `JWT_SECRET` | Secret Manager | 32바이트 이상 난수 |
 | `KAMIS_API_KEY` | Secret Manager | KAMIS Open API 인증 키 |
 | `KAMIS_CERT_ID` | Secret Manager | KAMIS 신청 계정의 요청자 ID (`p_cert_id`) |
+| `EDUCATION_PROGRESS_WEBHOOK_SECRET` | Secret Manager | LMS 진도 이벤트 HMAC-SHA256 공유 비밀키, 32바이트 이상 난수 |
+| `EDUCATION_PROGRESS_WEBHOOK_TOLERANCE` | Cloud Run env | 서명 시각 허용 오차. 기본 `5m` |
 | `JWT_ISSUER` | Cloud Run env | 고정 issuer. 예: `urn:cityfarmerplus:api` |
 | `CORS_ALLOWED_ORIGINS` | Cloud Run env | 실제 프론트 Origin 목록 |
 | `FILE_STORAGE_TYPE` | Cloud Run env | `gcs` |
@@ -100,6 +102,21 @@ bash gcp/migrate-backend2.sh
 세 변수는 모두 현재 운영 DB 자격증명 조합의 정확한 숫자 Secret version이어야 한다. `latest`나 일부 변수 생략은 다른 세대의 URL·사용자·비밀번호를 섞거나 잘못된 DB를 migration하는 위험 때문에 허용하지 않는다.
 
 성공 출력의 GCS 백업 URI와 SHA-256을 배포 기록에 보관한다. 과거 교육 제출의 당시 필수 시간은 기존 DB에 별도로 보존되지 않았으므로, `required_hours_snapshot`은 migration 실행 시점의 해당 과정 필수 시간으로 백필된다.
+
+실시간 교육 진도 기능을 처음 배포하기 전에는 별도 migration을 적용한다. 다음 runner는
+대상 테이블이 0개일 때만 전체 DB 백업·GCS 업로드 후 두 테이블을 만들고, 이미 두
+테이블이 정확히 존재하면 재실행하지 않는다. 한 테이블만 있는 부분 적용 상태나 스키마
+불일치는 즉시 중단한다.
+
+```bash
+export CFP_DB_URL_VERSION="2"
+export CFP_DB_USERNAME_VERSION="3"
+export CFP_DB_PASSWORD_VERSION="3"
+bash gcp/migrate-education-progress.sh
+```
+
+성공 후 `education_enrollments`, `education_progress_events`가 모두 존재하고 비어 있는지
+확인한 다음 애플리케이션 revision을 배포한다.
 
 로컬 PC에 `gcloud`가 없다면 무료 Cloud Shell에서 아래 명령을 실행할 수 있다.
 
@@ -227,7 +244,7 @@ done
 
 ## 7. Secret Manager
 
-여섯 개의 secret을 만든다. 이미 존재하면 그대로 재사용한다.
+일곱 개의 secret을 만든다. 이미 존재하면 그대로 재사용한다.
 
 ```bash
 for SECRET in \
@@ -236,7 +253,8 @@ for SECRET in \
   cityfarmerplus-db-password \
   cityfarmerplus-jwt-secret \
   cityfarmerplus-kamis-api-key \
-  cityfarmerplus-kamis-cert-id
+  cityfarmerplus-kamis-cert-id \
+  cityfarmerplus-education-progress-webhook-secret
 do
   gcloud secrets describe "$SECRET" >/dev/null 2>&1 || \
     gcloud secrets create "$SECRET" --replication-policy=automatic
@@ -281,6 +299,12 @@ KAMIS_CERT_ID_VERSION="$(printf %s "$VALUE" | gcloud secrets versions add \
   cityfarmerplus-kamis-cert-id --data-file=- --format='value(name)')"
 KAMIS_CERT_ID_VERSION="${KAMIS_CERT_ID_VERSION##*/}"
 unset VALUE
+
+IFS= read -r -s -p "Education progress webhook secret: " VALUE; echo
+EDUCATION_PROGRESS_WEBHOOK_SECRET_VERSION="$(printf %s "$VALUE" | gcloud secrets versions add \
+  cityfarmerplus-education-progress-webhook-secret --data-file=- --format='value(name)')"
+EDUCATION_PROGRESS_WEBHOOK_SECRET_VERSION="${EDUCATION_PROGRESS_WEBHOOK_SECRET_VERSION##*/}"
+unset VALUE
 ```
 
 기존 로그인 token을 유지해야 한다면 운영 환경에서 사용 중인 JWT secret을 그대로 입력한다. 새 값으로 바꾸면 기존 로그인 token이 모두 무효가 된다. 새 version으로 회전할 때는 `versions add` → Cloud Run 참조 변경 → smoke test → 구 version disable 순서를 지킨다.
@@ -294,13 +318,14 @@ export CFP_DB_PASSWORD_VERSION="3"
 export CFP_JWT_SECRET_VERSION="3"
 export CFP_KAMIS_API_KEY_VERSION="1"
 export CFP_KAMIS_CERT_ID_VERSION="1"
+export CFP_EDUCATION_PROGRESS_WEBHOOK_SECRET_VERSION="1"
 export JWT_ISSUER="urn:cityfarmerplus:api"
 bash gcp/deploy.sh
 ```
 
-여섯 Secret version과 `JWT_ISSUER`를 모두 명시해야 한다. 스크립트는 각 숫자 version이 `ENABLED`인지 확인하고 Cloud Run에 숫자로 고정한다. 새 revision은 commit과 실행별 nonce를 포함하며 Cloud Run 길이 제한을 지키는 고유 candidate 태그와 0% 트래픽으로 먼저 배포하고 `/health`와 KAMIS를 통과한 뒤에만 100% 트래픽으로 전환한다. 빌드 중 `origin/main`이 바뀌면 전환하지 않으며, 안정 URL 검증 또는 전환 이후 명령이 실패하거나 실행이 중단되면 직전 100% revision으로 자동 롤백한다. 회원가입·로그인, 인증 조회, DB 쓰기·재조회와 파일 검증까지 성공한 뒤에만 구 Secret version을 비활성화한다.
+일곱 Secret version과 `JWT_ISSUER`를 모두 명시해야 한다. 스크립트는 각 숫자 version이 `ENABLED`인지 확인하고 Cloud Run에 숫자로 고정한다. 새 revision은 commit과 실행별 nonce를 포함하며 Cloud Run 길이 제한을 지키는 고유 candidate 태그와 0% 트래픽으로 먼저 배포하고 `/health`, 교육 웹훅의 잘못된 서명 거절, KAMIS를 통과한 뒤에만 100% 트래픽으로 전환한다. 빌드 중 `origin/main`이 바뀌면 전환하지 않으며, 안정 URL 검증 또는 전환 이후 명령이 실패하거나 실행이 중단되면 직전 100% revision으로 자동 롤백한다. 회원가입·로그인, 인증 조회, DB 쓰기·재조회와 파일 검증까지 성공한 뒤에만 구 Secret version을 비활성화한다.
 
-DB 회전 전에는 직전 revision 이름, 여섯 Secret version, `JWT_ISSUER`를 배포 기록에 남긴다. 구 Aiven 사용자는 새 revision의 관찰 기간과 롤백 가능 기간이 모두 끝날 때까지 유지한다. Secret version을 먼저 비활성화했다가 롤백해야 한다면 해당 숫자 version을 다시 enable한 뒤 직전 revision으로 트래픽을 되돌린다.
+DB 회전 전에는 직전 revision 이름, 일곱 Secret version, `JWT_ISSUER`를 배포 기록에 남긴다. 구 Aiven 사용자는 새 revision의 관찰 기간과 롤백 가능 기간이 모두 끝날 때까지 유지한다. Secret version을 먼저 비활성화했다가 롤백해야 한다면 해당 숫자 version을 다시 enable한 뒤 직전 revision으로 트래픽을 되돌린다.
 
 런타임 서비스 계정에는 필요한 secret만 읽을 수 있게 부여한다.
 
@@ -311,7 +336,8 @@ for SECRET in \
   cityfarmerplus-db-password \
   cityfarmerplus-jwt-secret \
   cityfarmerplus-kamis-api-key \
-  cityfarmerplus-kamis-cert-id
+  cityfarmerplus-kamis-cert-id \
+  cityfarmerplus-education-progress-webhook-secret
 do
   gcloud secrets add-iam-policy-binding "$SECRET" \
     --member="serviceAccount:${RUNTIME_SA}" \
@@ -371,7 +397,7 @@ gcloud run deploy "$SERVICE" \
   --timeout=300 \
   --cpu-throttling \
   --env-vars-file=/tmp/cityfarmerplus-cloud-run.env.yaml \
-  --set-secrets="DB_URL=cityfarmerplus-db-url:${DB_URL_VERSION},DB_USERNAME=cityfarmerplus-db-username:${DB_USERNAME_VERSION},DB_PASSWORD=cityfarmerplus-db-password:${DB_PASSWORD_VERSION},JWT_SECRET=cityfarmerplus-jwt-secret:${JWT_SECRET_VERSION},KAMIS_API_KEY=cityfarmerplus-kamis-api-key:${KAMIS_API_KEY_VERSION},KAMIS_CERT_ID=cityfarmerplus-kamis-cert-id:${KAMIS_CERT_ID_VERSION}" \
+  --set-secrets="DB_URL=cityfarmerplus-db-url:${DB_URL_VERSION},DB_USERNAME=cityfarmerplus-db-username:${DB_USERNAME_VERSION},DB_PASSWORD=cityfarmerplus-db-password:${DB_PASSWORD_VERSION},JWT_SECRET=cityfarmerplus-jwt-secret:${JWT_SECRET_VERSION},KAMIS_API_KEY=cityfarmerplus-kamis-api-key:${KAMIS_API_KEY_VERSION},KAMIS_CERT_ID=cityfarmerplus-kamis-cert-id:${KAMIS_CERT_ID_VERSION},EDUCATION_PROGRESS_WEBHOOK_SECRET=cityfarmerplus-education-progress-webhook-secret:${EDUCATION_PROGRESS_WEBHOOK_SECRET_VERSION}" \
   --startup-probe="httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=0,failureThreshold=24,timeoutSeconds=2,periodSeconds=10" \
   --liveness-probe="httpGet.path=/health/live,httpGet.port=8080,initialDelaySeconds=0,failureThreshold=3,timeoutSeconds=2,periodSeconds=30"
 
@@ -396,12 +422,12 @@ curl -i "${SERVICE_URL}/health"
 
 현재 운영값은 `1 vCPU`, `2 GiB`, 동시 실행 `1`, 최소 인스턴스 `0`, 최대 인스턴스 `1`이다. Spring Boot 통합 애플리케이션이 더 작은 메모리에서 기동 실패한 기록을 반영한 값이며, 무료 한도를 넘으면 과금될 수 있으므로 실제 활성 시간과 비용 알림을 함께 확인한다.
 
-저장소에 포함된 `gcp/bootstrap.sh`는 이 문서의 API·서비스 계정·전용 bucket·Secret 껍데기 생성을 멱등 실행한다. `gcp/deploy.sh`는 이미 정상 traffic을 제공 중인 Cloud Run 서비스의 무중단 갱신 전용이다. clean `main`이 최신 `origin/main`과 같은지 확인하고 여섯 Secret의 숫자 version과 운영 `JWT_ISSUER`를 명시적으로 고정해 후보 revision을 검증한 뒤 traffic을 전환한다. Cloud Run 서비스가 아직 없다면 이 절보다 앞선 최초 생성 절차를 먼저 수행한다.
+저장소에 포함된 `gcp/bootstrap.sh`는 이 문서의 API·서비스 계정·전용 bucket·Secret 껍데기 생성을 멱등 실행한다. `gcp/deploy.sh`는 이미 정상 traffic을 제공 중인 Cloud Run 서비스의 무중단 갱신 전용이다. clean `main`이 최신 `origin/main`과 같은지 확인하고 일곱 Secret의 숫자 version과 운영 `JWT_ISSUER`를 명시적으로 고정해 후보 revision을 검증한 뒤 traffic을 전환한다. Cloud Run 서비스가 아직 없다면 이 절보다 앞선 최초 생성 절차를 먼저 수행한다.
 
 ```bash
 bash gcp/bootstrap.sh
-# 여섯 개 secret version을 안전하게 입력한 다음
-# CFP_*_VERSION 여섯 개와 JWT_ISSUER를 export
+# 일곱 개 secret version을 안전하게 입력한 다음
+# CFP_*_VERSION 일곱 개와 JWT_ISSUER를 export
 bash gcp/deploy.sh
 ```
 
@@ -429,7 +455,7 @@ gcloud storage rm "$DEPLOY_LOCK_URI" \
 6. GitHub `main`이 이 빌드 commit과 여전히 같은지 확인한다. 더 최신 commit이 있으면 오래된 빌드는 승격하지 않는다.
 7. 검사와 commit 확인이 성공한 정확한 candidate revision에만 100% 트래픽을 전환하고 안정 URL을 다시 검사한다. 전환 이후 실패·중단이 발생하면 직전 100% revision으로 자동 롤백하고 health를 재검증한다.
 
-따라서 최초 Cloud Run 서비스와 환경 변수·여섯 Secret mapping·서비스 계정은 8절에서 먼저 만들어야 한다. 특히 `KAMIS_CERT_ID`가 기존 서비스에 매핑되지 않은 상태에서 main을 병합하면 candidate smoke가 실패하며 운영 트래픽은 기존 revision에 남는다. KAMIS secret 생성·version 입력·런타임 권한·Cloud Run mapping을 먼저 완료한다.
+따라서 최초 Cloud Run 서비스와 환경 변수·일곱 Secret mapping·서비스 계정은 8절에서 먼저 만들어야 한다. 특히 `KAMIS_CERT_ID`가 기존 서비스에 매핑되지 않은 상태에서 main을 병합하면 candidate smoke가 실패하며 운영 트래픽은 기존 revision에 남는다. KAMIS secret 생성·version 입력·런타임 권한·Cloud Run mapping을 먼저 완료한다. 교육 진도 웹훅 secret이 아직 매핑되지 않으면 애플리케이션은 기동하지만 진도 이벤트 경로만 `503 EDUCATION_PROGRESS_WEBHOOK_DISABLED`로 닫힌다.
 
 Cloud Build trigger는 GCP Console에서 다음 값으로 만든다.
 
