@@ -5,6 +5,8 @@ import chungbuk.cityfarmerplus.education.dto.EducationCertificationResponse;
 import chungbuk.cityfarmerplus.education.entity.EducationCertificateSubmission;
 import chungbuk.cityfarmerplus.education.entity.EducationCertification;
 import chungbuk.cityfarmerplus.education.entity.EducationCourse;
+import chungbuk.cityfarmerplus.education.progress.entity.EducationEnrollment;
+import chungbuk.cityfarmerplus.education.progress.repository.EducationEnrollmentRepository;
 import chungbuk.cityfarmerplus.education.repository.EducationCertificateSubmissionRepository;
 import chungbuk.cityfarmerplus.education.repository.EducationCourseRepository;
 import org.junit.jupiter.api.Test;
@@ -30,6 +32,9 @@ class EducationProgressServiceTest {
 
     @Mock
     private EducationCertificateSubmissionRepository submissionRepository;
+
+    @Mock
+    private EducationEnrollmentRepository enrollmentRepository;
 
     @Test
     void allMandatoryCoursesMustBeApprovedAndTheirHoursAreAggregated() {
@@ -60,9 +65,12 @@ class EducationProgressServiceTest {
                         certification.getId()
                 ))
                 .thenReturn(List.of(advancedSubmission, basicSubmission));
+        when(enrollmentRepository.findAllForProgress(USER_ID, List.of(1L, 2L)))
+                .thenReturn(List.of());
         EducationProgressService service = new EducationProgressService(
                 courseRepository,
                 submissionRepository,
+                enrollmentRepository,
                 new EducationCertificationProgressCalculator()
         );
 
@@ -122,9 +130,12 @@ class EducationProgressServiceTest {
                         certification.getId()
                 ))
                 .thenReturn(List.of(insufficient, basicSubmission));
+        when(enrollmentRepository.findAllForProgress(USER_ID, List.of(1L, 2L)))
+                .thenReturn(List.of());
         EducationProgressService service = new EducationProgressService(
                 courseRepository,
                 submissionRepository,
+                enrollmentRepository,
                 new EducationCertificationProgressCalculator()
         );
 
@@ -149,6 +160,47 @@ class EducationProgressServiceTest {
                             .isEqualTo(EducationCertificateSubmission.SubmissionStatus.APPROVED);
                     assertThat(progress.recognizedHours()).isEqualTo(8);
                 });
+    }
+
+    @Test
+    void providerProgressIsExposedWithoutGrantingApplicationEligibility() {
+        EducationCourse course = mandatoryCourse(1L, "농업안전 기초", 8, 1);
+        User user = urbanFarmer();
+        ReflectionTestUtils.setField(user, "id", USER_ID);
+        EducationEnrollment enrollment = EducationEnrollment.create(
+                user,
+                course,
+                "CHUNGBUK_LMS",
+                "enrollment-21-1",
+                480,
+                240,
+                Instant.parse("2026-08-28T00:00:00Z"),
+                Instant.parse("2026-08-28T00:00:01Z")
+        );
+        when(courseRepository.findAllByActiveTrueOrderByDisplayOrderAscTitleAsc())
+                .thenReturn(List.of(course));
+        when(enrollmentRepository.findAllForProgress(USER_ID, List.of(1L)))
+                .thenReturn(List.of(enrollment));
+        EducationProgressService service = new EducationProgressService(
+                courseRepository,
+                submissionRepository,
+                enrollmentRepository,
+                new EducationCertificationProgressCalculator()
+        );
+
+        EducationCertificationResponse response = service.getProgress(USER_ID, null);
+
+        assertThat(response.eligibleToApply()).isFalse();
+        assertThat(response.status())
+                .isEqualTo(EducationCertification.CertificationStatus.NOT_SUBMITTED);
+        assertThat(response.courses()).singleElement().satisfies(progress -> {
+            assertThat(progress.progressStatus())
+                    .isEqualTo(EducationEnrollment.ProgressStatus.IN_PROGRESS);
+            assertThat(progress.totalMinutes()).isEqualTo(480);
+            assertThat(progress.completedMinutes()).isEqualTo(240);
+            assertThat(progress.remainingMinutes()).isEqualTo(240);
+            assertThat(progress.progressPercentage()).isEqualTo(50);
+        });
     }
 
     private User urbanFarmer() {

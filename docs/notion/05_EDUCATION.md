@@ -1,12 +1,13 @@
 # CityFarmerPlus 교육 과정·이수증 인증 API
 
-- 기준일: 2026-08-27
-- 기준 소스: 통합 코드의 교육 사용자·관리자 Controller, DTO, Service, Entity, Repository, 파일 Validator
+- 기준일: 2026-08-28
+- 기준 소스: 통합 코드의 교육 사용자·관리자·진도 연동 Controller, DTO, Service, Entity, Repository, 서명·파일 Validator
 - 로컬 Base URL: `http://localhost:8080`
 - 운영 Base URL: `https://cityfarmerplus-api-82951616760.us-west1.run.app`
-- 구현 API: 6개
+- 구현 API: 7개
 
 > 이 문서는 도시농부용 교육 API를 노션에 단독으로 복사할 수 있게 정리한다. 중개센터의 과정 관리와 이수증 심사 API는 통합돼 있으며 요청·응답 상세는 `ADMIN_EDUCATION_COURSE_API_SPEC.md`, `ADMIN_EDUCATION_SUBMISSION_API_SPEC.md`를 따른다.
+> 교육기관 HMAC 서명과 수강률 응답의 독립 명세는 `EDUCATION_PROGRESS_API_SPEC.md`를 따른다.
 
 ---
 
@@ -23,6 +24,8 @@
 - 제출된 회차와 파일은 덮어쓰지 않는다. 반려 후 재제출하면 새 회차가 추가되고 과거 제출은 유지된다.
 - 제출 직후 상태는 `PENDING_REVIEW`다.
 - 승인·반려 결과는 통합된 중개센터 담당자 API가 같은 도메인 모델에 저장한다.
+- 교육기관이 서명한 진도 이벤트를 보내면 과정별 수강 시간과 수강률을 갱신한다.
+- 실시간 수강 진도와 이수증 심사 결과는 별개다. 수강률 100%만으로 공고 지원 자격을 자동 부여하지 않는다.
 
 공고 지원 API에서는 다음 조건을 다시 검사한다.
 
@@ -64,6 +67,13 @@ Authorization: Bearer {{urbanFarmerAccessToken}}
 | 보안 필터 통과 직후 계정 역할이 바뀐 경쟁 상황을 서비스가 다시 방어 | 403 | `URBAN_FARMER_ROLE_REQUIRED` |
 | 보안 필터 통과 직후 계정이 사라진 경쟁 상황을 서비스가 다시 방어 | 404 | `USER_NOT_FOUND` |
 
+### 교육기관 서버 연동 API
+
+`POST /api/integrations/education/progress-events`는 사용자 JWT 대신
+`X-Education-Event-Timestamp`와 `X-Education-Signature` HMAC 헤더를 검증한다.
+공유 비밀키는 32바이트 이상 난수로 생성해 서버의 `EDUCATION_PROGRESS_WEBHOOK_SECRET`에만 저장하며 브라우저나
+모바일 앱에 포함하면 안 된다. 비밀키가 비어 있으면 이 API는 `503`으로 비활성화된다.
+
 오류 본문은 공통적으로 다음 형식이다.
 
 ```json
@@ -85,6 +95,7 @@ Authorization: Bearer {{urbanFarmerAccessToken}}
 | 이수증 제출·재제출 | `POST` | `/api/urban-farmers/me/education-certification/submissions` | `URBAN_FARMER` | 201 |
 | 내 이수증 제출 상세 | `GET` | `/api/urban-farmers/me/education-certification/submissions/{submissionId}` | `URBAN_FARMER` | 200 |
 | 내 이수증 파일 다운로드 | `GET` | `/api/urban-farmers/me/education-certification/submissions/{submissionId}/documents/{documentId}` | `URBAN_FARMER` 소유자 | 200 |
+| 교육기관 진도 이벤트 | `POST` | `/api/integrations/education/progress-events` | HMAC 서명 | 200 |
 
 ---
 
@@ -187,7 +198,16 @@ Authorization: Bearer {{urbanFarmerAccessToken}}
       "attemptNumber": 1,
       "recognizedHours": 8,
       "rejectionReason": null,
-      "submittedAt": "2026-08-05T02:00:00Z"
+      "submittedAt": "2026-08-05T02:00:00Z",
+      "progressStatus": "IN_PROGRESS",
+      "totalMinutes": 480,
+      "completedMinutes": 240,
+      "remainingMinutes": 240,
+      "progressPercentage": 50,
+      "startedAt": "2026-08-28T00:00:00Z",
+      "completedAt": null,
+      "progressUpdatedAt": "2026-08-28T00:30:00Z",
+      "lastSyncedAt": "2026-08-28T00:30:01Z"
     },
     {
       "courseId": 2,
@@ -201,7 +221,16 @@ Authorization: Bearer {{urbanFarmerAccessToken}}
       "attemptNumber": null,
       "recognizedHours": null,
       "rejectionReason": null,
-      "submittedAt": null
+      "submittedAt": null,
+      "progressStatus": "NOT_STARTED",
+      "totalMinutes": 480,
+      "completedMinutes": 0,
+      "remainingMinutes": 480,
+      "progressPercentage": 0,
+      "startedAt": null,
+      "completedAt": null,
+      "progressUpdatedAt": null,
+      "lastSyncedAt": null
     }
   ]
 }
@@ -236,6 +265,61 @@ Authorization: Bearer {{urbanFarmerAccessToken}}
 | `APPROVED` | 활성 필수 과정을 모두 기준 시간 이상 승인받음 |
 
 판정 우선순위는 `APPROVED → PENDING_REVIEW → REJECTED → PARTIALLY_APPROVED → NOT_SUBMITTED`다.
+
+### 과정별 실시간 수강 진도 필드
+
+| 필드 | 타입 | Nullable | 설명 |
+|---|---|---|---|
+| `progressStatus` | Enum | N | `NOT_STARTED`, `IN_PROGRESS`, `COMPLETED` |
+| `totalMinutes` | Integer | N | 교육기관이 보낸 전체 과정 시간. 연동 전에는 `requiredHours * 60` |
+| `completedMinutes` | Integer | N | 현재까지 수강한 시간 |
+| `remainingMinutes` | Integer | N | `max(0, totalMinutes - completedMinutes)` |
+| `progressPercentage` | Integer | N | 완료 전 100%가 표시되지 않도록 소수점을 버린 0~100 정수 수강률 |
+| `startedAt` | Instant | Y | 최초 1분 이상 수강한 이벤트 발생 시각 |
+| `completedAt` | Instant | Y | 최초 100% 완료 이벤트 발생 시각 |
+| `progressUpdatedAt` | Instant | Y | 현재 값으로 반영된 교육기관 이벤트 발생 시각 |
+| `lastSyncedAt` | Instant | Y | 서버가 마지막 이벤트를 수신한 시각 |
+
+프론트 화면은 이 조회 API를 화면 진입 시 호출하고, 수강 화면에서 돌아온 뒤 다시
+호출한다. 교육기관이 웹훅을 지원해 수강 중 갱신을 보여줘야 한다면 5~10초 간격으로
+재조회할 수 있다. 서버는 이벤트 수신 즉시 DB를 갱신하지만 현재 계약은 WebSocket이나
+SSE 푸시를 제공하지 않는다.
+
+### 교육기관 진도 이벤트
+
+```http
+POST {{baseUrl}}/api/integrations/education/progress-events
+Content-Type: application/json
+X-Education-Event-Timestamp: 1787875200
+X-Education-Signature: sha256={{hmacHex}}
+```
+
+```json
+{
+  "provider": "CHUNGBUK_LMS",
+  "eventId": "evt-20260828-0001",
+  "externalEnrollmentId": "enrollment-21-1",
+  "urbanFarmerId": 21,
+  "courseId": 1,
+  "totalMinutes": 480,
+  "completedMinutes": 240,
+  "occurredAt": "2026-08-28T00:30:00Z"
+}
+```
+
+서명 대상 바이트는 `timestamp + "." + rawJsonBody`이고 알고리즘은
+`HMAC-SHA256`이다. JSON을 다시 직렬화하지 말고 HTTP로 보내는 원본 바이트를 그대로
+서명해야 한다. 기본 허용 시각 오차는 5분이다.
+
+- `(provider, eventId)`는 멱등 키다. 같은 원문 재전송은 현재 등록 상태를 `200`으로 반환한다.
+- 같은 멱등 키에 다른 본문을 보내면 `409 EDUCATION_PROGRESS_EVENT_CONFLICT`다.
+- 과거 시각의 새 이벤트는 감사 이력에는 저장하지만 현재 수강 시간을 덮어쓰지 않는다.
+- 더 최신 이벤트가 수강 시간을 감소시키거나 완료 과정을 다시 미완료로 만들면 `409 EDUCATION_PROGRESS_REGRESSION`이다.
+- 도시농부 계정과 교육 과정은 모두 활성 상태여야 한다.
+- `completedMinutes`는 `0 <= completedMinutes <= totalMinutes`여야 한다.
+- `totalMinutes`는 서버에 설정된 과정의 `requiredHours * 60`보다 짧을 수 없다.
+- 이 API 성공 응답은 등록 ID와 현재 수강 상태·시간·수강률을 담은 `EducationEnrollmentResponse`다.
+- 실제 자동 갱신을 시작하려면 교육기관 LMS가 이 계약으로 이벤트를 전송하도록 별도 설정해야 한다.
 
 ---
 
@@ -520,12 +604,21 @@ Postman form-data 예시:
 | 400 | `INVALID_EDUCATION_FILENAME` | 파일명이 없거나 255 UTF-8 bytes 초과, 제어문자 포함 |
 | 400 | `INVALID_EDUCATION_DOCUMENT` | 파일 읽기 실패, 시그니처 판별 실패, 확장자·MIME·실제 내용 불일치 |
 | 400 | `INSUFFICIENT_EDUCATION_HOURS` | 제출 시간이 `max(8, requiredHours)`보다 작음 |
+| 400 | `INVALID_EDUCATION_PROGRESS_EVENT` | 진도 이벤트 JSON을 해석할 수 없음 |
+| 400 | `INVALID_EDUCATION_PROGRESS` | 수강 시간이 전체 시간을 초과함 |
+| 400 | `INVALID_EDUCATION_PROGRESS_TIME` | 이벤트 발생 시각이 현재보다 5분 넘게 미래임 |
+| 400 | `INSUFFICIENT_EDUCATION_PROGRESS_DURATION` | 전체 교육 시간이 과정 필수 시간보다 짧음 |
+| 401 | `INVALID_EDUCATION_PROGRESS_SIGNATURE` | HMAC 서명·서명 형식·서명 시각이 유효하지 않음 |
 | 403 | `EDUCATION_CERTIFICATION_REQUIRED` | 공고 지원 시 활성 필수 과정을 모두 승인받지 못함 |
+| 404 | `ACTIVE_URBAN_FARMER_NOT_FOUND` | 진도 이벤트 대상이 활성 도시농부가 아님 |
 | 404 | `ACTIVE_EDUCATION_COURSE_NOT_FOUND` | 과정이 없거나 비활성 상태 |
 | 404 | `EDUCATION_SUBMISSION_NOT_FOUND` | 본인 소유 제출을 찾을 수 없음 |
 | 404 | `EDUCATION_DOCUMENT_NOT_FOUND` | 제출·문서·본인 소유 관계가 일치하지 않음 |
 | 409 | `EDUCATION_SUBMISSION_NOT_ALLOWED` | 같은 과정 최신 제출이 심사 대기 또는 승인 상태 |
 | 409 | `EDUCATION_SUBMISSION_DATA_CONFLICT` | 동시 제출로 회차 DB 제약 충돌 |
+| 409 | `EDUCATION_PROGRESS_EVENT_CONFLICT` | 같은 진도 이벤트 ID에 다른 본문을 사용함 |
+| 409 | `EDUCATION_ENROLLMENT_CONFLICT` | 회원·과정·외부 등록 ID 연결이 기존 값과 충돌함 |
+| 409 | `EDUCATION_PROGRESS_REGRESSION` | 더 최신 이벤트가 진도를 감소시키거나 완료를 취소함 |
 | 409 | `CONCURRENT_UPDATE_CONFLICT` | 잠금 경합 또는 동시 갱신 충돌 |
 | 410 | `EDUCATION_DOCUMENT_FILE_UNAVAILABLE` | 실제 파일이 삭제됐거나 읽을 수 없음 |
 | 413 | `EDUCATION_DOCUMENT_TOO_LARGE` | 개별 10 MiB 또는 총합 30 MiB 초과 |
@@ -533,6 +626,7 @@ Postman form-data 예시:
 | 415 | `UNSUPPORTED_EDUCATION_DOCUMENT_TYPE` | 허용하지 않는 확장자 또는 확장자 없음 |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | multipart가 아니거나 `request` Part 형식이 지원되지 않음 |
 | 500 | `EDUCATION_DOCUMENT_STORAGE_FAILED` | 검증 후 파일 저장 실패 또는 저장 무결성 불일치 |
+| 503 | `EDUCATION_PROGRESS_WEBHOOK_DISABLED` | 서버에 웹훅 비밀키가 설정되지 않음 |
 
 ---
 
