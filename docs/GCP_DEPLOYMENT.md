@@ -392,7 +392,7 @@ gcloud run deploy "$SERVICE" \
   --port=8080 \
   --cpu=1 \
   --memory=2Gi \
-  --concurrency=1 \
+  --concurrency=5 \
   --min=0 \
   --max=1 \
   --timeout=300 \
