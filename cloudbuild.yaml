@@ -133,7 +133,7 @@ steps:
           --image="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_IMAGE}:${_TAG}" \
           --cpu=1 \
           --memory=2Gi \
-          --concurrency=1 \
+          --concurrency=5 \
           --min=0 \
           --max=1 \
           --timeout=300 \
