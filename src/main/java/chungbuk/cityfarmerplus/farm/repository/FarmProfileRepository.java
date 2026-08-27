@@ -49,5 +49,7 @@ public interface FarmProfileRepository extends JpaRepository<FarmProfile, Long> 
             """)
     Optional<FarmProfile> findByIdForUpdate(@Param("profileId") Long profileId);
 
+    List<FarmProfile> findAllByStatusOrderByUpdatedAtDesc(FarmProfile.FarmProfileStatus status);
+
     long countByStatus(FarmProfile.FarmProfileStatus status);
 }
