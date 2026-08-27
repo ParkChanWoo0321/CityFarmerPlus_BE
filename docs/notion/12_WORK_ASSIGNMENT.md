@@ -246,7 +246,7 @@
 }
 ```
 
-오류: `VALIDATION_ERROR`(400), `FARM_PROFILE_NOT_FOUND`(404), 인증/역할 오류.
+오류: `VALIDATION_ERROR`(400), `FARM_APPROVAL_REQUIRED`(403), 인증/역할 오류.
 
 ## 5. 농가 출근/결근 등록
 

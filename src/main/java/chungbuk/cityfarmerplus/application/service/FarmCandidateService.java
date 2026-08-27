@@ -30,7 +30,7 @@ public class FarmCandidateService {
     private final JobApplicationRepository applicationRepository;
 
     public List<JobCandidateResponse> getCandidates(Long farmUserId, Long postingId) {
-        accessService.requireFarmProfile(farmUserId);
+        accessService.requireApprovedFarm(farmUserId);
         getOwnedPosting(farmUserId, postingId);
         return applicationRepository.findByJobPostingIdOrderByCreatedAtAsc(postingId)
                 .stream()
@@ -45,7 +45,7 @@ public class FarmCandidateService {
             Long applicationId,
             FarmOpinionRequest request
     ) {
-        accessService.requireFarmProfileForUpdate(farmUserId);
+        accessService.requireApprovedFarmForUpdate(farmUserId);
         JobPosting posting = getOwnedPostingForUpdate(farmUserId, postingId);
         if (!posting.isAcceptingApplications(
                 LocalDate.now(SERVICE_ZONE),
