@@ -2,7 +2,7 @@
 
 - 문서 버전: 1.0
 - 작성일: 2026-08-20
-- 구현 기준 브랜치: `backend-2`
+- 구현 기준: 현재 `main` 통합 코드
 - 적용 범위: 교육 이수증 제출 목록 조회, 상세 조회, 승인, 반려
 
 ## 1. 공통 사항
@@ -10,7 +10,8 @@
 ### 1.1 기본 URL
 
 ```text
-http://localhost:8080
+운영: https://cityfarmerplus-api-82951616760.us-west1.run.app
+로컬: http://localhost:8080
 ```
 
 ### 1.2 요청 및 응답 형식
@@ -28,7 +29,7 @@ Authorization: Bearer {{adminAccessToken}}
 - 서비스 레이어에서 JWT와 무관하게 **DB에 저장된 실제 역할을 다시 조회**한다(`AdminEducationSubmissionService.requireCenterAdmin`).
 - 심사자 ID는 요청 body로 받지 않는다. 항상 JWT의 `sub`(`AuthenticatedUser.id(authentication)`)에서 추출한다.
 - 이 API들은 [`education`](../src/main/java/chungbuk/cityfarmerplus/education) 패키지의 `EducationCertificateSubmission` 엔티티, `EducationCertificateSubmissionRepository`, 응답 DTO(`EducationSubmissionResponse`)를 그대로 재사용한다.
-- **승인·반려에 성공하면 개별 제출 건뿐 아니라, 도시농부 1명의 전체 교육 이수 집계(`EducationCertification`)도 같은 트랜잭션 안에서 즉시 재계산된다**(`EducationCertificationProgressSynchronizer.synchronizeLocked`). 여러 필수 과정이 있을 때 이번 심사 건 하나만으로 전체 이수 상태가 `APPROVED`로 바뀌지 않으며, 활성 필수 과정 전체의 최신 제출 상태를 다시 계산한 결과에 따라 `NOT_SUBMITTED` / `PENDING_REVIEW` / `PARTIALLY_APPROVED` / `APPROVED` / `REJECTED` 중 하나로 갱신된다. 이 집계 결과는 이 API의 응답에는 포함되지 않으며, 도시농부 본인용 `GET /api/education/certification`([`education` 도메인 조회 API]) 등으로 확인해야 한다.
+- **승인·반려에 성공하면 개별 제출 건뿐 아니라, 도시농부 1명의 전체 교육 이수 집계(`EducationCertification`)도 같은 트랜잭션 안에서 즉시 재계산된다**(`EducationCertificationProgressSynchronizer.synchronizeLocked`). 여러 필수 과정이 있을 때 이번 심사 건 하나만으로 전체 이수 상태가 `APPROVED`로 바뀌지 않으며, 활성 필수 과정 전체의 최신 제출 상태를 다시 계산한 결과에 따라 `NOT_SUBMITTED` / `PENDING_REVIEW` / `PARTIALLY_APPROVED` / `APPROVED` / `REJECTED` 중 하나로 갱신된다. 이 집계 결과는 이 API의 응답에는 포함되지 않으며, 도시농부 본인용 `GET /api/urban-farmers/me/education-certification` 등으로 확인해야 한다.
 
 ### 1.4 공통 오류 응답 형식
 

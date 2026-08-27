@@ -1,8 +1,9 @@
 # CityFarmerPlus 도시농부 사업참여 신청 API 명세서
 
 - 기준일: 2026-08-20
-- 기준 소스: 현재 `backend-1` 작업 폴더의 `ParticipationApplicationController`, DTO, Service, Entity 및 공통 인증·예외 코드
+- 기준 소스: 현재 `main` 통합 코드의 `ParticipationApplicationController`, DTO, Service, Entity 및 공통 인증·예외 코드
 - 로컬 Base URL: `http://localhost:8080`
+- 운영 Base URL: `https://cityfarmerplus-api-82951616760.us-west1.run.app`
 - API 수: 7개
 
 > 이 API의 신청서는 도시농부 사업 자체에 참여하기 위한 신청이다. 희망 근무 조건과 개별 농가 공고 지원은 각각 별도 도메인이다. 이 문서에는 도시농부 본인 API만 포함하며 중개센터 승인·반려 API는 포함하지 않는다.
@@ -83,7 +84,7 @@ DRAFT --삭제--> 실제 레코드 삭제
 DRAFT | SUBMITTED | APPROVED | REJECTED --취소--> CANCELLED
 ```
 
-승인과 반려를 수행하는 중개센터 HTTP API는 backend-1에 없다. `APPROVED`, `REJECTED`, 심사자 필드는 backend-2와 합칠 공통 도메인 계약으로 존재한다.
+승인과 반려는 현재 통합 코드의 `POST /api/admin/participation-applications/{applicationId}/approve`, `POST /api/admin/participation-applications/{applicationId}/reject`가 처리한다. `CENTER_ADMIN` JWT가 필요하며 상세 계약은 `../ADMIN_PARTICIPATION_APPLICATION_API_SPEC.md`를 따른다.
 
 회원 탈퇴 처리에서는 별도 규칙을 사용한다. 해당 사용자의 신청 행을 잠근 뒤 `DRAFT`, `SUBMITTED`, `REJECTED`만 `CANCELLED`로 바꾸고, `APPROVED`와 이미 `CANCELLED`인 신청은 유지한다. 반려 신청을 취소할 때도 기존 `reviewedByUserId`, `reviewedAt`, `rejectionReason`은 이력으로 보존한다.
 
@@ -606,6 +607,6 @@ Authorization: Bearer {{accessToken}}
 - 도시농부 프로필이나 교육 인증 여부를 생성·수정·제출 시 검사하지 않는다.
 - 교육 인증은 개별 농가 공고 지원 자격에서 별도로 검사한다.
 - `agriculturalBusinessRegistered`는 신청서 입력값이며 이 API에서 서류로 검증하지 않는다.
-- 승인·반려를 수행하는 backend-1 HTTP API는 없다.
+- 승인·반려는 통합된 `CENTER_ADMIN` HTTP API가 처리하며 이 문서에는 도시농부 본인 API만 기재한다.
 - 이 문서의 개별 사업참여 API만 호출하면 희망 근무 조건이 자동 생성되지 않는다.
 - 통합 신청 폼 API를 호출한 경우에만 프로필·희망 근무 조건·사업참여 신청이 한 트랜잭션에서 함께 저장된다.

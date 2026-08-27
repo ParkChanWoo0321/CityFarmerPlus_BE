@@ -39,5 +39,11 @@ class CorsConfigTest {
                 "/health"
         );
         assertThat(source.getCorsConfiguration(healthRequest)).isSameAs(cors);
+
+        MockHttpServletRequest livenessRequest = new MockHttpServletRequest(
+                "OPTIONS",
+                "/health/live"
+        );
+        assertThat(source.getCorsConfiguration(livenessRequest)).isSameAs(cors);
     }
 }

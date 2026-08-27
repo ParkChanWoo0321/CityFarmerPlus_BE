@@ -2,7 +2,7 @@
 
 - 문서 버전: 1.0
 - 작성일: 2026-08-26
-- 구현 기준 브랜치: `backend-2`
+- 구현 기준: 현재 `main` 통합 코드
 - 적용 범위: 교육 과정 생성, 수정, 비활성화
 
 ## 1. 공통 사항
@@ -10,7 +10,8 @@
 ### 1.1 기본 URL
 
 ```text
-http://localhost:8080
+운영: https://cityfarmerplus-api-82951616760.us-west1.run.app
+로컬: http://localhost:8080
 ```
 
 ### 1.2 요청 및 응답 형식

@@ -43,6 +43,7 @@ public class CorsConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", configuration);
         source.registerCorsConfiguration("/health", configuration);
+        source.registerCorsConfiguration("/health/**", configuration);
         return source;
     }
 }

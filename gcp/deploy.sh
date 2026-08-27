@@ -12,7 +12,7 @@ RUNTIME_SA="${RUNTIME_SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 BUILD_SA_RESOURCE="projects/${PROJECT_ID}/serviceAccounts/${BUILD_SA}"
 GCS_BUCKET="${PROJECT_ID}-cityfarmerplus-private"
 BUILD_SOURCE_BUCKET="${PROJECT_ID}-cityfarmerplus-build-source"
-JWT_ISSUER="${JWT_ISSUER:-https://api.cityfarmerplus.local}"
+JWT_ISSUER="${JWT_ISSUER:?Set JWT_ISSUER explicitly to the current production issuer.}"
 CORS_ALLOWED_ORIGINS="${CORS_ALLOWED_ORIGINS:-https://cityfarmerplus.site,https://www.cityfarmerplus.site,http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
@@ -35,27 +35,45 @@ if [[ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]]; then
   exit 1
 fi
 
-latest_enabled_version() {
+resolve_enabled_version() {
   local secret="$1"
-  local version
-  version="$(gcloud secrets versions list "${secret}" \
-    --filter='state=ENABLED' \
-    --sort-by='~createTime' \
-    --format='value(name)' \
-    --limit=1 \
-    --project="${PROJECT_ID}")"
-  if [[ -z "${version}" ]]; then
-    echo "Secret ${secret} has no enabled version." >&2
+  local requested_version="$2"
+  local state
+  if [[ ! "${requested_version}" =~ ^[0-9]+$ ]]; then
+    echo "Secret ${secret} version must be numeric." >&2
     return 1
   fi
-  printf '%s' "${version##*/}"
+  state="$(gcloud secrets versions describe "${requested_version}" \
+    --secret="${secret}" \
+    --format='value(state)' \
+    --project="${PROJECT_ID}")"
+  if [[ "${state}" != "ENABLED" ]]; then
+    echo "Secret ${secret} version ${requested_version} is not enabled." >&2
+    return 1
+  fi
+  printf '%s' "${requested_version}"
 }
 
-DB_URL_VERSION="$(latest_enabled_version cityfarmerplus-db-url)"
-DB_USERNAME_VERSION="$(latest_enabled_version cityfarmerplus-db-username)"
-DB_PASSWORD_VERSION="$(latest_enabled_version cityfarmerplus-db-password)"
-JWT_SECRET_VERSION="$(latest_enabled_version cityfarmerplus-jwt-secret)"
-KAMIS_API_KEY_VERSION="$(latest_enabled_version cityfarmerplus-kamis-api-key)"
+for required_version_variable in \
+  CFP_DB_URL_VERSION \
+  CFP_DB_USERNAME_VERSION \
+  CFP_DB_PASSWORD_VERSION \
+  CFP_JWT_SECRET_VERSION \
+  CFP_KAMIS_API_KEY_VERSION \
+  CFP_KAMIS_CERT_ID_VERSION; do
+  if [[ -z "${!required_version_variable:-}" ]]; then
+    echo "${required_version_variable} must be set to an explicit numeric secret version." >&2
+    exit 1
+  fi
+done
+unset required_version_variable
+
+DB_URL_VERSION="$(resolve_enabled_version cityfarmerplus-db-url "${CFP_DB_URL_VERSION}")"
+DB_USERNAME_VERSION="$(resolve_enabled_version cityfarmerplus-db-username "${CFP_DB_USERNAME_VERSION}")"
+DB_PASSWORD_VERSION="$(resolve_enabled_version cityfarmerplus-db-password "${CFP_DB_PASSWORD_VERSION}")"
+JWT_SECRET_VERSION="$(resolve_enabled_version cityfarmerplus-jwt-secret "${CFP_JWT_SECRET_VERSION}")"
+KAMIS_API_KEY_VERSION="$(resolve_enabled_version cityfarmerplus-kamis-api-key "${CFP_KAMIS_API_KEY_VERSION}")"
+KAMIS_CERT_ID_VERSION="$(resolve_enabled_version cityfarmerplus-kamis-cert-id "${CFP_KAMIS_CERT_ID_VERSION}")"
 
 COMMIT_SHA="$(git rev-parse HEAD)"
 SHORT_SHA="$(git rev-parse --short=7 HEAD)"
@@ -86,6 +104,21 @@ gcloud builds submit . \
   --substitutions="BRANCH_NAME=main,_REGION=${REGION},_REPOSITORY=${REPOSITORY},_IMAGE=${SERVICE},_SERVICE=${SERVICE},_TAG=${SHORT_SHA},_DEPLOY=false"
 
 IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${SERVICE}:${SHORT_SHA}"
+current_traffic_revision() {
+  gcloud run services describe "${SERVICE}" \
+    --project="${PROJECT_ID}" \
+    --region="${REGION}" \
+    --flatten='status.traffic[]' \
+    --filter='status.traffic.percent=100' \
+    --format='value(status.traffic.revisionName)'
+}
+
+PREVIOUS_REVISION="$(current_traffic_revision)"
+if [[ -z "${PREVIOUS_REVISION}" ]]; then
+  echo 'An existing Cloud Run service with one 100% production revision is required.' >&2
+  exit 1
+fi
+CANDIDATE_TAG="candidate-${SHORT_SHA}-$(date -u +'%H%M%S')"
 
 gcloud run deploy "${SERVICE}" \
   --project="${PROJECT_ID}" \
@@ -102,10 +135,61 @@ gcloud run deploy "${SERVICE}" \
   --max=1 \
   --timeout=300 \
   --cpu-throttling \
+  --no-traffic \
+  --tag="${CANDIDATE_TAG}" \
   --env-vars-file="${ENV_FILE}" \
-  --set-secrets="DB_URL=cityfarmerplus-db-url:${DB_URL_VERSION},DB_USERNAME=cityfarmerplus-db-username:${DB_USERNAME_VERSION},DB_PASSWORD=cityfarmerplus-db-password:${DB_PASSWORD_VERSION},JWT_SECRET=cityfarmerplus-jwt-secret:${JWT_SECRET_VERSION},KAMIS_API_KEY=cityfarmerplus-kamis-api-key:${KAMIS_API_KEY_VERSION}" \
+  --set-secrets="DB_URL=cityfarmerplus-db-url:${DB_URL_VERSION},DB_USERNAME=cityfarmerplus-db-username:${DB_USERNAME_VERSION},DB_PASSWORD=cityfarmerplus-db-password:${DB_PASSWORD_VERSION},JWT_SECRET=cityfarmerplus-jwt-secret:${JWT_SECRET_VERSION},KAMIS_API_KEY=cityfarmerplus-kamis-api-key:${KAMIS_API_KEY_VERSION},KAMIS_CERT_ID=cityfarmerplus-kamis-cert-id:${KAMIS_CERT_ID_VERSION}" \
   --startup-probe="httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=0,failureThreshold=24,timeoutSeconds=2,periodSeconds=10" \
   --liveness-probe="httpGet.path=/health/live,httpGet.port=8080,initialDelaySeconds=0,failureThreshold=3,timeoutSeconds=2,periodSeconds=30"
+
+CANDIDATE_REVISION=""
+if ! CANDIDATE_REVISION="$(gcloud run services describe "${SERVICE}" \
+  --project="${PROJECT_ID}" \
+  --region="${REGION}" \
+  --flatten='status.traffic[]' \
+  --filter="status.traffic.tag=${CANDIDATE_TAG}" \
+  --format='value(status.traffic.revisionName)')"; then
+  CANDIDATE_REVISION=""
+fi
+CANDIDATE_URL=""
+if ! CANDIDATE_URL="$(gcloud run services describe "${SERVICE}" \
+  --project="${PROJECT_ID}" \
+  --region="${REGION}" \
+  --flatten='status.traffic[]' \
+  --filter="status.traffic.tag=${CANDIDATE_TAG}" \
+  --format='value(status.traffic.url)')"; then
+  CANDIDATE_URL=""
+fi
+
+if [[ -z "${CANDIDATE_REVISION}" || -z "${CANDIDATE_URL}" ]]; then
+  echo 'Candidate revision or tagged URL could not be resolved; production traffic was not changed.' >&2
+  gcloud run services update-traffic "${SERVICE}" \
+    --project="${PROJECT_ID}" \
+    --region="${REGION}" \
+    --remove-tags="${CANDIDATE_TAG}" \
+    --quiet || true
+  exit 1
+fi
+
+if ! bash "${SCRIPT_DIR}/smoke-public.sh" "${CANDIDATE_URL}"; then
+  gcloud run services update-traffic "${SERVICE}" \
+    --project="${PROJECT_ID}" \
+    --region="${REGION}" \
+    --remove-tags="${CANDIDATE_TAG}" \
+    --quiet || true
+  exit 1
+fi
+
+git fetch origin main --quiet
+if [[ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]]; then
+  echo 'origin/main advanced while the candidate was building; production traffic was not changed.' >&2
+  gcloud run services update-traffic "${SERVICE}" \
+    --project="${PROJECT_ID}" \
+    --region="${REGION}" \
+    --remove-tags="${CANDIDATE_TAG}" \
+    --quiet || true
+  exit 1
+fi
 
 gcloud run services add-iam-policy-binding "${SERVICE}" \
   --project="${PROJECT_ID}" \
@@ -118,5 +202,92 @@ SERVICE_URL="$(gcloud run services describe "${SERVICE}" \
   --region="${REGION}" \
   --format='value(status.url)')"
 
-curl --fail --show-error --silent "${SERVICE_URL}/health"
-printf '\nService URL: %s\nRevision source: %s\n' "${SERVICE_URL}" "${COMMIT_SHA}"
+TRAFFIC_SWITCHED=false
+rollback_and_exit() {
+  local exit_code="$1"
+  local current_revision
+  local rollback_succeeded=false
+  local rollback_owner_changed=false
+  trap - ERR INT TERM
+  set +e
+  current_revision="$(current_traffic_revision)"
+  if [[ "${current_revision}" == "${CANDIDATE_REVISION}" ]]; then
+    echo "Deployment failed after traffic change; rolling back to ${PREVIOUS_REVISION}." >&2
+    for attempt in 1 2 3; do
+      current_revision="$(current_traffic_revision)"
+      if [[ "${current_revision}" != "${CANDIDATE_REVISION}" ]]; then
+        if [[ "${current_revision}" == "${PREVIOUS_REVISION}" ]]; then
+          rollback_succeeded=true
+        elif [[ -n "${current_revision}" ]]; then
+          echo "Rollback stopped because traffic is now owned by ${current_revision}." >&2
+          rollback_owner_changed=true
+        else
+          echo 'CRITICAL: current production revision could not be resolved during rollback.' >&2
+        fi
+        break
+      fi
+      gcloud run services update-traffic "${SERVICE}" \
+        --project="${PROJECT_ID}" \
+        --region="${REGION}" \
+        --to-revisions="${PREVIOUS_REVISION}=100" \
+        --quiet
+      if [[ "$(current_traffic_revision)" == "${PREVIOUS_REVISION}" ]]; then
+        rollback_succeeded=true
+        break
+      fi
+      if [[ "${attempt}" -lt 3 ]]; then
+        sleep 5
+      fi
+    done
+    if [[ "${rollback_succeeded}" == true ]]; then
+      bash "${SCRIPT_DIR}/smoke-health.sh" "${SERVICE_URL}" || \
+        echo 'Rollback revision was restored, but rollback health verification failed.' >&2
+    elif [[ "${rollback_owner_changed}" != true ]]; then
+      echo "CRITICAL: traffic rollback to ${PREVIOUS_REVISION} failed." >&2
+    fi
+  elif [[ -n "${current_revision}" ]]; then
+    echo "Traffic is now owned by ${current_revision}; this failed deployment did not overwrite it." >&2
+  else
+    echo 'CRITICAL: current production revision could not be resolved; rollback was not attempted.' >&2
+  fi
+  gcloud run services update-traffic "${SERVICE}" \
+    --project="${PROJECT_ID}" \
+    --region="${REGION}" \
+    --remove-tags="${CANDIDATE_TAG}" \
+    --quiet || true
+  exit "${exit_code}"
+}
+CURRENT_REVISION=""
+if ! CURRENT_REVISION="$(current_traffic_revision)"; then
+  CURRENT_REVISION=""
+fi
+if [[ "${CURRENT_REVISION}" != "${PREVIOUS_REVISION}" ]]; then
+  echo "Production traffic changed from ${PREVIOUS_REVISION} to ${CURRENT_REVISION}; this candidate was not promoted." >&2
+  gcloud run services update-traffic "${SERVICE}" \
+    --project="${PROJECT_ID}" \
+    --region="${REGION}" \
+    --remove-tags="${CANDIDATE_TAG}" \
+    --quiet || true
+  exit 1
+fi
+trap 'rollback_and_exit $?' ERR
+trap 'rollback_and_exit 130' INT
+trap 'rollback_and_exit 143' TERM
+
+TRAFFIC_SWITCHED=true
+gcloud run services update-traffic "${SERVICE}" \
+  --project="${PROJECT_ID}" \
+  --region="${REGION}" \
+  --to-revisions="${CANDIDATE_REVISION}=100" \
+  --quiet
+
+bash "${SCRIPT_DIR}/smoke-public.sh" "${SERVICE_URL}"
+TRAFFIC_SWITCHED=false
+trap - ERR INT TERM
+gcloud run services update-traffic "${SERVICE}" \
+  --project="${PROJECT_ID}" \
+  --region="${REGION}" \
+  --remove-tags="${CANDIDATE_TAG}" \
+  --quiet || echo "Candidate tag ${CANDIDATE_TAG} could not be removed." >&2
+printf 'Service URL: %s\nRevision: %s\nPrevious revision: %s\nRevision source: %s\n' \
+  "${SERVICE_URL}" "${CANDIDATE_REVISION}" "${PREVIOUS_REVISION}" "${COMMIT_SHA}"

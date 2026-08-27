@@ -2,9 +2,11 @@
 
 - 문서 버전: 2.0
 - 갱신일: 2026-08-20
-- 구현 기준 브랜치: `backend-1`
+- 구현 기준: 현재 `main` 통합 코드
 - 적용 범위: 농가 프로필 등록, 내 프로필 조회·수정
 - 관련 문서: `FARM_OWNERSHIP_SUBMISSION_API_SPEC.md`, `API_SPEC_INDEX.md`
+- 운영 Base URL: `https://cityfarmerplus-api-82951616760.us-west1.run.app`
+- 로컬 Base URL: `http://localhost:8080`
 
 ## 1. 핵심 규칙
 
@@ -14,9 +16,9 @@
 - 서비스에서도 DB 사용자의 계정 상태와 실제 역할을 다시 확인한다.
 - 신규 농가 프로필은 항상 `DRAFT` 상태로 생성된다.
 - `users.account_status=ACTIVE`는 로그인이 가능한 계정이라는 의미다.
-- `farm_profiles.status=APPROVED`는 backend-2 심사 결과로 농가 소유가 승인되었다는 의미다.
+- `farm_profiles.status=APPROVED`는 중개센터 심사 결과로 농가 소유가 승인되었다는 의미다.
 - 소유 증빙 제출은 `FARM_OWNERSHIP_SUBMISSION_API_SPEC.md`에서 별도로 정의한다.
-- `CENTER_ADMIN`, 심사자 필드, 승인·반려 상태는 backend-2 병합용 공통 계약이다. backend-1에는 담당자 처리 API가 없다.
+- `CENTER_ADMIN`은 통합된 담당자 API로 농가 소유 증빙을 조회하고 승인·반려할 수 있다.
 
 ## 2. API 목록
 
@@ -209,7 +211,7 @@ Content-Type: application/json
 
 ## 7. 농가 프로필 상태
 
-| 상태 | 의미 | backend-1에서 직접 만드는 전이 |
+| 상태 | 의미 | 농가 사용자 API에서 직접 만드는 전이 |
 |---|---|---|
 | `DRAFT` | 기본 정보만 작성한 초안 | O |
 | `PENDING_REVIEW` | 소유 증빙을 제출하고 담당자 검토 중 | O |
@@ -223,8 +225,8 @@ Content-Type: application/json
 DRAFT
 → 소유 증빙 제출
 → PENDING_REVIEW
-→ backend-2 승인: APPROVED
-→ backend-2 반려: REJECTED
+→ 중개센터 승인: APPROVED
+→ 중개센터 반려: REJECTED
 → 증빙 재제출: PENDING_REVIEW
 ```
 
@@ -274,6 +276,6 @@ DRAFT
 7. `PATCH {{baseUrl}}/api/farm-profiles/me`로 전체 필드 수정을 확인한다.
 8. 도시농부 토큰으로 호출해 `403 ACCESS_DENIED`인지 확인한다.
 
-## 10. backend-2 경계
+## 10. 중개센터 심사 연동
 
-backend-1에는 농가 심사 목록·상세·승인·반려 API와 담당자 증빙 다운로드 API가 없다. 다만 심사 결과 필드와 상태 전이는 backend-2 병합 시 동일한 모델을 사용하기 위해 유지하며, backend-1은 그 결과를 조회하고 `APPROVED` 여부를 공고 작성 자격에 사용한다.
+농가 심사 목록·상세·승인·반려와 담당자 증빙 다운로드 API가 `/api/admin/farm-profiles/**`에 통합돼 있다. 사용자 API는 같은 모델에 저장된 심사 결과를 조회하고 `APPROVED` 여부를 공고 작성 자격에 사용한다. 상세 계약은 `ADMIN_FARM_OWNERSHIP_API_SPEC.md`를 따른다.

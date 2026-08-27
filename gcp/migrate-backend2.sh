@@ -33,13 +33,50 @@ gcloud storage buckets describe "gs://${APP_BUCKET}" \
   --project="${PROJECT_ID}" \
   --format='value(name)' >/dev/null
 
-DB_URL="$(gcloud secrets versions access latest \
+for required_version_variable in \
+  CFP_DB_URL_VERSION \
+  CFP_DB_USERNAME_VERSION \
+  CFP_DB_PASSWORD_VERSION; do
+  if [[ -z "${!required_version_variable:-}" ]]; then
+    echo "${required_version_variable} must be set to an explicit numeric secret version." >&2
+    exit 1
+  fi
+done
+unset required_version_variable
+
+DB_URL_VERSION="${CFP_DB_URL_VERSION}"
+DB_USERNAME_VERSION="${CFP_DB_USERNAME_VERSION}"
+DB_PASSWORD_VERSION="${CFP_DB_PASSWORD_VERSION}"
+
+for SECRET_AND_VERSION in \
+  "cityfarmerplus-db-url:${DB_URL_VERSION}" \
+  "cityfarmerplus-db-username:${DB_USERNAME_VERSION}" \
+  "cityfarmerplus-db-password:${DB_PASSWORD_VERSION}"; do
+  SECRET_NAME="${SECRET_AND_VERSION%%:*}"
+  SECRET_VERSION="${SECRET_AND_VERSION##*:}"
+  if [[ ! "${SECRET_VERSION}" =~ ^[0-9]+$ ]]; then
+    printf 'Secret %s version must be numeric.\n' "${SECRET_NAME}" >&2
+    exit 1
+  fi
+  SECRET_STATE="$(gcloud secrets versions describe "${SECRET_VERSION}" \
+    --secret="${SECRET_NAME}" \
+    --project="${PROJECT_ID}" \
+    --format='value(state)')"
+  if [[ "${SECRET_STATE}" != "ENABLED" ]]; then
+    printf 'Secret %s version %s is not enabled.\n' \
+      "${SECRET_NAME}" "${SECRET_VERSION}" >&2
+    exit 1
+  fi
+done
+unset SECRET_AND_VERSION SECRET_NAME SECRET_VERSION SECRET_STATE
+
+DB_URL="$(gcloud secrets versions access "${DB_URL_VERSION}" \
   --secret=cityfarmerplus-db-url \
   --project="${PROJECT_ID}")"
-DB_USER="$(gcloud secrets versions access latest \
+DB_USER="$(gcloud secrets versions access "${DB_USERNAME_VERSION}" \
   --secret=cityfarmerplus-db-username \
   --project="${PROJECT_ID}")"
-DB_PASS="$(gcloud secrets versions access latest \
+DB_PASS="$(gcloud secrets versions access "${DB_PASSWORD_VERSION}" \
   --secret=cityfarmerplus-db-password \
   --project="${PROJECT_ID}")"
 

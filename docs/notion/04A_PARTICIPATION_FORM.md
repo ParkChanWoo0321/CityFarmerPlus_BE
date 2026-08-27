@@ -1,8 +1,9 @@
 # 도시농부 통합 사업참여 신청 폼 API
 
 - 기준일: 2026-08-20
-- 기준: 현재 `backend-1` 코드
+- 기준: 현재 `main` 통합 코드
 - 로컬 Base URL: `http://localhost:8080`
+- 운영 Base URL: `https://cityfarmerplus-api-82951616760.us-west1.run.app`
 - API 수: 3개
 
 ## 기능 목적과 기존 API 관계
@@ -196,8 +197,8 @@ curl -X POST "{{baseUrl}}/api/urban-farmers/me/participation-forms/2026/submit" 
 
 마지막 제출 예시의 version 값은 앞선 조회·저장 응답의 실제 값으로 교체해야 한다. 세 리소스가 모두 없으면 version 필드를 `null`로 보낸다.
 
-## backend-2 경계
+## 사용자·중개센터 역할 경계
 
-- backend-1은 통합 저장과 `SUBMITTED` 전환까지 처리한다.
-- `SUBMITTED → APPROVED/REJECTED` 심사는 backend-2 중개센터 API가 처리한다.
+- 도시농부 사용자 API는 통합 저장과 `SUBMITTED` 전환까지 처리한다.
+- `SUBMITTED → APPROVED/REJECTED` 심사는 현재 통합된 `CENTER_ADMIN` 중개센터 API가 처리한다.
 - 승인·반려는 동일한 `ParticipationApplication` ID와 version을 기준으로 처리해야 한다.

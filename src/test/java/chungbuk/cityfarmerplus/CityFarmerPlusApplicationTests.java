@@ -1,12 +1,11 @@
 package chungbuk.cityfarmerplus;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest
-@EnabledIfEnvironmentVariable(named = "DB_PASSWORD", matches = ".+")
-@EnabledIfEnvironmentVariable(named = "JWT_SECRET", matches = ".{32,}")
+@ActiveProfiles("test")
 class CityFarmerPlusApplicationTests {
 
     @Test

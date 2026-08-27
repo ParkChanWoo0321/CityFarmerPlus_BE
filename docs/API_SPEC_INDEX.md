@@ -2,18 +2,19 @@
 
 - 문서 버전: 4.0
 - 갱신일: 2026-08-27
-- 기준: backend-1 + backend-2 통합 후 현재 Controller·DTO·Security·Service 코드
-- 현재 HTTP 작업 수: 110개 (`OPTIONS` preflight 제외, 메서드 매핑 기준)
+- 기준: 현재 `main` 통합 코드의 Controller·DTO·Validation·Security·Service·Exception
+- 현재 HTTP 작업 수: 111개 (`OPTIONS` preflight 제외, 메서드 매핑 기준)
 
 ## 1. 기준 문서
 
 | 문서 | 용도 | 현황 |
 |---|---|---|
-| [FULL_API_SPEC.md](FULL_API_SPEC.md) | 사용자 API 공통 계약과 상세 명세 | 사용자 업무 API + health 기준 |
+| [FULL_API_SPEC.md](FULL_API_SPEC.md) | 전체 111개 API 통합 계약 | 사용자 67 + 관리자·내부 발급 42 + health 2의 method/path 정본 |
 | [AUTH_API_SPEC.md](AUTH_API_SPEC.md) | 회원가입, JWT, 내 정보, 탈퇴 | 현재 코드 반영 |
 | [FARM_PROFILE_API_SPEC.md](FARM_PROFILE_API_SPEC.md) | 농가 프로필 생성·조회·수정 | 현재 코드 반영 |
 | [FARM_OWNERSHIP_SUBMISSION_API_SPEC.md](FARM_OWNERSHIP_SUBMISSION_API_SPEC.md) | 농가 소유 증빙 제출·이력·파일 조회 | 현재 코드 반영 |
-| [NOTION_API_SPEC.md](NOTION_API_SPEC.md) | 노션 복사용 사용자 API 요약본 | 관리자 API는 아래 전용 명세를 함께 사용 |
+| [MARKET_PRICE_API_SPEC.md](MARKET_PRICE_API_SPEC.md) | KAMIS 최근 조사 가격 조회 | 현재 코드 반영 |
+| [NOTION_API_SPEC.md](NOTION_API_SPEC.md) | 노션 복사용 사용자 API 요약본 | 사용자 화면용 축약본 |
 | [notion/04A_PARTICIPATION_FORM.md](notion/04A_PARTICIPATION_FORM.md) | 디자인 한 화면용 통합 신청 폼 3 API | 현재 코드 반영 |
 | [notion/10_PUBLIC_JOB_POSTING.md](notion/10_PUBLIC_JOB_POSTING.md) | 모집 중·마감 공고 검색과 내 지원 요약 | 현재 코드 반영 |
 | [notion/11_JOB_APPLICATION.md](notion/11_JOB_APPLICATION.md) | 공고 지원과 지원 시점 조건 스냅샷 | 현재 코드 반영 |
@@ -26,15 +27,17 @@
 | [ADMIN_WORK_ASSIGNMENT_API_SPEC.md](ADMIN_WORK_ASSIGNMENT_API_SPEC.md) | 근무 조회·출결 정정 | 현재 코드 반영 |
 | [ADMIN_PROXY_REGISTRATION_API_SPEC.md](ADMIN_PROXY_REGISTRATION_API_SPEC.md) | 관리자 대리 접수 | 현재 코드 반영 |
 
-새 프론트 연동과 Postman 컬렉션은 사용자 API는 `FULL_API_SPEC.md`, 관리자 API는 위 `ADMIN_*_API_SPEC.md`를 기준으로 한다.
+새 프론트 연동과 Postman 컬렉션은 사용자·관리자 모두 `FULL_API_SPEC.md`를 1차 정본으로 사용한다. 위 기능별 문서는 요청·응답 예시, 상태 전이와 운영 설명을 더 자세히 보는 보조 명세다. 관리자 42개는 `/api/admin/**` 41개와 운영 기본 비활성인 `POST /api/internal/center-admins` 1개이며, 내부 발급 계약은 통합본 13장과 `AUTH_API_SPEC.md`에 함께 기록한다.
 
 ## 2. 현재 구현 현황
 
 | 코드 영역 | HTTP 작업 수 |
 |---|---:|
-| 사용자·공개·health 영역 | 68 |
-| `/api/admin/**` 영역 | 42 |
-| 합계 | **110** |
+| 사용자·공개 API | 67 |
+| `/api/admin/**` CENTER_ADMIN API | 41 |
+| 내부 담당자 발급 API | 1 |
+| health | 2 |
+| 합계 | **111** |
 
 기능별 집계:
 
@@ -49,9 +52,10 @@
 | 근무·출결·작업 안내 | 6 | 도시농부 3, 농가 3 |
 | 홈 | 2 | 도시농부 홈, 농가 홈 |
 | FAQ·AI 상담 | 3 | FAQ 1, 상담 2 |
+| 농산물 가격 | 1 | KAMIS 최근 조사 가격 조회 |
 | health | 2 | readiness(`/health`), liveness(`/health/live`) |
 | 관리자 | 42 | 계정 발급, 대시보드, 심사, 과정, 공고·매칭, 출결 정정, 대리 접수 |
-| 합계 | **110** | Controller 메서드 매핑 기준 |
+| 합계 | **111** | Controller 메서드 매핑 기준 |
 
 ## 3. 인증 기준
 
@@ -61,6 +65,13 @@
 - `GET /api/auth/check-id`
 - `POST /api/auth/login`
 - `GET /api/education/courses`
+- `GET /api/job-postings`
+- `GET /api/job-postings/{postingId}`
+- `GET /api/support/faqs`
+- `GET /api/market-prices/latest`
+- `GET /health`
+- `GET /health/live`
+- `POST /api/internal/center-admins` (provisioning key가 설정된 동안만)
 - 모든 경로의 `OPTIONS` preflight
 
 그 외 API에는 다음 헤더가 필요하다.
@@ -69,11 +80,11 @@
 Authorization: Bearer {{accessToken}}
 ```
 
-이름이 Public인 공고 조회 컨트롤러와 FAQ도 현재 전역 보안 설정상 Bearer JWT가 필요하다.
+공개 공고 조회에 유효한 JWT를 선택적으로 보내면 현재 사용자의 지원 이력이 응답에 추가된다. 공개 API라도 잘못된 Bearer JWT를 보내면 401을 반환한다.
 
-## 4. backend-1과 backend-2 통합 상태
+## 4. 사용자·중개센터 통합 상태
 
-현재 develop 기준에는 backend-1 사용자 기능과 backend-2 중개센터 기능이 함께 들어 있다. 다음 계약은 동일한 DB와 트랜잭션 경계로 연결된다.
+현재 `main` 통합 코드에는 사용자 기능과 중개센터 기능이 함께 들어 있다. 다음 계약은 동일한 DB와 트랜잭션 경계로 연결된다.
 
 - `CENTER_ADMIN` 사용자 유형
 - 농가·교육·사업참여·공고의 승인·반려 상태
@@ -92,10 +103,10 @@ Authorization: Bearer {{accessToken}}
 회원가입·로그인
 → 개별 API로 프로필·희망 근무 조건·사업참여 신청을 작성하거나 통합 폼으로 한 번에 저장·제출
 → 필수 교육별 이수증 제출
-→ backend-2 심사 결과가 모두 APPROVED
+→ CENTER_ADMIN 심사 결과가 모두 APPROVED
 → OPEN 공고 조회·지원
 → 농가 선호 의견
-→ backend-2 최종 매칭
+→ CENTER_ADMIN 최종 매칭
 → 근무 일정·작업 안내 조회
 ```
 
@@ -105,11 +116,11 @@ Authorization: Bearer {{accessToken}}
 회원가입·로그인
 → 농가 프로필
 → 소유 증빙 제출
-→ backend-2 심사 결과가 APPROVED
+→ CENTER_ADMIN 심사 결과가 APPROVED
 → 공고 초안·심사 요청
-→ backend-2 승인으로 OPEN
+→ CENTER_ADMIN 승인으로 OPEN
 → 지원자 의견
-→ backend-2 최종 매칭
+→ CENTER_ADMIN 최종 매칭
 → 출결·근무 완료
 ```
 

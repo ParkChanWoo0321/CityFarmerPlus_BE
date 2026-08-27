@@ -1,11 +1,12 @@
 # CityFarmerPlus 농가 프로필 API
 
-- 기준일: 2026-08-20
-- 기준 소스: 현재 `backend-1` 작업 폴더의 FarmProfile Controller, DTO, Service, Entity, Exception
+- 기준일: 2026-08-27
+- 기준 소스: 통합 코드의 FarmProfile 사용자·관리자 Controller, DTO, Service, Entity, Exception
 - 로컬 Base URL: `http://localhost:8080`
+- 운영 Base URL: `https://cityfarmerplus-api-82951616760.us-west1.run.app`
 - 구현 API: 3개
 
-> 이 문서는 다른 문서를 보지 않아도 노션에 단독으로 복사할 수 있는 농가 프로필 명세다. 현재 backend-1은 농가 본인의 프로필 생성·조회·수정만 제공한다. 담당자의 농가 소유 승인·반려 API는 backend-2 범위다.
+> 이 문서는 농가 사용자용 프로필 API를 노션에 단독으로 복사할 수 있게 정리한다. 중개센터의 농가 소유 조회·승인·반려 API도 통합돼 있으며 상세 계약은 `ADMIN_FARM_OWNERSHIP_API_SPEC.md`를 따른다.
 
 ---
 
@@ -306,20 +307,20 @@ farmAreaPyeong
 프로필 생성
   └─> DRAFT
         └─ 소유 증빙 제출 ─> PENDING_REVIEW
-                               ├─ backend-2 승인 ─> APPROVED
-                               └─ backend-2 반려 ─> REJECTED
+                               ├─ 중개센터 승인 ─> APPROVED
+                               └─ 중개센터 반려 ─> REJECTED
                                                       └─ 재제출 ─> PENDING_REVIEW
 
 APPROVED ── 소유 핵심 정보 변경 ─> DRAFT
 회원 탈퇴 ──────────────────────> INACTIVE
 ```
 
-| 상태 | 의미 | backend-1 사용자 API에서 직접 생성 가능 |
+| 상태 | 의미 | 농가 사용자 API에서 직접 생성 가능 |
 |---|---|---|
 | `DRAFT` | 농가 기본 정보만 있는 초안 | O, 프로필 생성 또는 승인 후 핵심 정보 변경 |
 | `PENDING_REVIEW` | 소유 증빙 제출 후 담당자 심사 대기 | O, 소유 증빙 제출 결과 |
-| `APPROVED` | 담당자가 농가 소유를 승인 | X, backend-2 심사 결과 필요 |
-| `REJECTED` | 담당자가 농가 소유를 반려 | X, backend-2 심사 결과 필요 |
+| `APPROVED` | 담당자가 농가 소유를 승인 | X, 중개센터 심사 결과 필요 |
+| `REJECTED` | 담당자가 농가 소유를 반려 | X, 중개센터 심사 결과 필요 |
 | `INACTIVE` | 회원 탈퇴에 따른 비활성화 | O, 계정 탈퇴 처리 내부 동작 |
 
 상태를 요청 JSON으로 직접 변경하는 API는 없다.
@@ -345,9 +346,9 @@ APPROVED ── 소유 핵심 정보 변경 ─> DRAFT
 
 ---
 
-## 11. backend-2 담당자 기능과의 경계
+## 11. 중개센터 담당자 기능 연동
 
-현재 backend-1에는 다음 HTTP API가 없다.
+현재 통합 코드에는 다음 HTTP API가 구현돼 있다.
 
 - 농가 심사 대기 목록·상세 API
 - 농가 소유 증빙 담당자 다운로드 API
@@ -355,14 +356,14 @@ APPROVED ── 소유 핵심 정보 변경 ─> DRAFT
 - 농가 반려 API
 - 담당자가 승인된 농가 정보를 대신 수정하는 API
 
-다만 병합을 위한 다음 공통 계약은 이미 존재한다.
+사용자와 담당자 API는 다음 공통 계약을 사용한다.
 
 - 담당자 역할 `CENTER_ADMIN`
 - 상태 `PENDING_REVIEW`, `APPROVED`, `REJECTED`
 - `reviewerId`, `reviewerName`, `reviewedAt`, `rejectionReason`
 - 담당자만 심사할 수 있다는 Entity 규칙
 
-따라서 backend-1만 실행하면 프로필 생성과 증빙 제출로 `PENDING_REVIEW`까지 진행할 수 있지만, 정상 HTTP 요청만으로 `APPROVED` 또는 `REJECTED` 상태를 만들 수 없다.
+농가가 프로필과 증빙을 제출해 `PENDING_REVIEW`로 만들고, `CENTER_ADMIN`이 담당자 API로 `APPROVED` 또는 `REJECTED`로 심사한다.
 
 ---
 
@@ -376,4 +377,4 @@ APPROVED ── 소유 핵심 정보 변경 ─> DRAFT
 6. `PATCH /api/farm-profiles/me`에서 모든 필드를 보내 수정한다.
 7. 도시농부 토큰으로 호출해 `403 ACCESS_DENIED`를 확인한다.
 8. 소유 증빙 제출 후 `PENDING_REVIEW` 상태에서 수정을 시도해 `409 FARM_PROFILE_UPDATE_NOT_ALLOWED`를 확인한다.
-9. backend-2 승인 기능 병합 후 비핵심 수정은 `APPROVED` 유지, 핵심 수정은 `DRAFT` 복귀인지 확인한다.
+9. 중개센터 승인 후 비핵심 수정은 `APPROVED` 유지, 핵심 수정은 `DRAFT` 복귀인지 확인한다.
