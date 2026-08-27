@@ -69,17 +69,25 @@ if [[ -z "${DB_HOST}" || -z "${DB_NAME}" || ! "${DB_PORT}" =~ ^[0-9]+$ ]]; then
   exit 1
 fi
 
-MYSQL_CONNECTION_ARGS=(
+MYSQL_BASE_CONNECTION_ARGS=(
   --protocol=TCP
   --connect-timeout=15
   -h "${DB_HOST}"
   -P "${DB_PORT}"
   -u "${DB_USER}"
 )
+MYSQL_CONNECTION_ARGS=("${MYSQL_BASE_CONNECTION_ARGS[@]}")
 if mysql --help 2>&1 | grep -q -- '--ssl-mode'; then
   MYSQL_CONNECTION_ARGS+=(--ssl-mode=REQUIRED)
-else
+elif mysql --help 2>&1 | grep -Eq '(^|[[:space:]])--ssl([=[:space:]]|$)'; then
   MYSQL_CONNECTION_ARGS+=(--ssl)
+fi
+
+MYSQLDUMP_CONNECTION_ARGS=("${MYSQL_BASE_CONNECTION_ARGS[@]}")
+if mysqldump --help 2>&1 | grep -q -- '--ssl-mode'; then
+  MYSQLDUMP_CONNECTION_ARGS+=(--ssl-mode=REQUIRED)
+elif mysqldump --help 2>&1 | grep -Eq '(^|[[:space:]])--ssl([=[:space:]]|$)'; then
+  MYSQLDUMP_CONNECTION_ARGS+=(--ssl)
 fi
 
 TABLE_COUNT="$(MYSQL_PWD="${DB_PASS}" mysql \
@@ -114,7 +122,7 @@ if mysqldump --help 2>&1 | grep -q -- '--no-tablespaces'; then
 fi
 
 MYSQL_PWD="${DB_PASS}" mysqldump \
-  "${MYSQL_CONNECTION_ARGS[@]}" \
+  "${MYSQLDUMP_CONNECTION_ARGS[@]}" \
   "${DUMP_ARGS[@]}" \
   "${DB_NAME}" | gzip -9 >"${BACKUP_FILE}"
 
