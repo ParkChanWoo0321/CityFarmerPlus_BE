@@ -571,8 +571,8 @@ HTTP/1.1 201 Created
 | `403` | `ACCESS_DENIED` | `CENTER_ADMIN`이 아닌 계정의 JWT로 접근(URL 패턴 단계) |
 | `403` | `CENTER_ADMIN_ROLE_REQUIRED` | 관리자 계정이 `CENTER_ADMIN`이 아니거나 삭제됨 |
 | `403` | `INACTIVE_ACCOUNT` | 관리자 계정 또는 `{userId}` 대상 계정이 정지·탈퇴 상태 |
-| `403` | `FARM_APPROVAL_REQUIRED` | `{userId}`의 농가 프로필이 아직 `APPROVED` 상태가 아님 |
 | `404` | `USER_NOT_FOUND` | JWT의 관리자 ID 또는 `{userId}`에 해당하는 회원이 없음 |
+| `404` | `FARM_PROFILE_NOT_FOUND` | `{userId}`에 연결된 농가 프로필이 없음 |
 
 ## 13. 대리 접수 작업 종류(`ActionType`)·대상 객체 종류(`TargetType`)
 

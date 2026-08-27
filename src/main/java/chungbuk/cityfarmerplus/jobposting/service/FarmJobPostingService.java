@@ -49,7 +49,7 @@ public class FarmJobPostingService {
             JobPostingUpsertRequest request,
             boolean submitForReview
     ) {
-        FarmProfile farmProfile = accessService.requireApprovedFarmForUpdate(userId);
+        FarmProfile farmProfile = accessService.requireFarmProfileForUpdate(userId);
         scheduleValidator.validate(
                 request.workDate(),
                 request.startTime(),
@@ -122,7 +122,7 @@ public class FarmJobPostingService {
             Long postingId,
             JobPostingUpsertRequest request
     ) {
-        accessService.requireApprovedFarmForUpdate(userId);
+        accessService.requireFarmProfileForUpdate(userId);
         scheduleValidator.validate(
                 request.workDate(),
                 request.startTime(),
@@ -141,7 +141,7 @@ public class FarmJobPostingService {
 
     @Transactional
     public void deleteDraft(Long userId, Long postingId) {
-        accessService.requireApprovedFarmForUpdate(userId);
+        accessService.requireFarmProfileForUpdate(userId);
         JobPosting posting = getOwnedForUpdate(userId, postingId);
         if (posting.getStatus() != JobPosting.JobPostingStatus.DRAFT) {
             throw JobPostingException.invalidState("초안 상태의 공고만 삭제할 수 있습니다.");
@@ -152,7 +152,7 @@ public class FarmJobPostingService {
 
     @Transactional
     public JobPostingResponse submitReview(Long userId, Long postingId) {
-        accessService.requireApprovedFarmForUpdate(userId);
+        accessService.requireFarmProfileForUpdate(userId);
         JobPosting posting = getOwnedForUpdate(userId, postingId);
         scheduleValidator.validate(
                 posting.getWorkDate(),
@@ -165,7 +165,7 @@ public class FarmJobPostingService {
 
     @Transactional
     public JobPostingResponse withdrawReview(Long userId, Long postingId) {
-        accessService.requireApprovedFarmForUpdate(userId);
+        accessService.requireFarmProfileForUpdate(userId);
         JobPosting posting = getOwnedForUpdate(userId, postingId);
         transition(posting::withdrawReview);
         return responseAssembler.assemble(posting);
@@ -177,7 +177,7 @@ public class FarmJobPostingService {
             Long postingId,
             String preference
     ) {
-        accessService.requireApprovedFarmForUpdate(userId);
+        accessService.requireFarmProfileForUpdate(userId);
         JobPosting posting = getOwnedForUpdate(userId, postingId);
         ZonedDateTime now = ZonedDateTime.now(SERVICE_ZONE);
         if (!posting.isAcceptingApplications(
@@ -194,7 +194,7 @@ public class FarmJobPostingService {
 
     @Transactional
     public JobPostingResponse cancel(Long userId, Long postingId) {
-        accessService.requireApprovedFarmForUpdate(userId);
+        accessService.requireFarmProfileForUpdate(userId);
         JobPosting posting = getOwnedForUpdate(userId, postingId);
         if (applicationRepository.existsByJobPostingIdAndStatus(
                 postingId,

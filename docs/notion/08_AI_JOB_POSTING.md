@@ -33,7 +33,7 @@
 | Method | `POST` |
 | URL | `/api/ai/job-posting-previews` |
 | 성공 코드 | `200 OK` |
-| 권한 | `FARM` + 승인된 농가 |
+| 권한 | 활성 `FARM` + 저장된 농가 프로필 |
 | Content-Type | `application/json` |
 
 #### 요청 필드
@@ -90,7 +90,6 @@
 | 400 | `INVALID_JOB_POSTING_DETAILS` | 종료 시간이 시작 시간보다 늦지 않음 |
 | 401 | `UNAUTHORIZED` / `INVALID_ACCOUNT` | JWT 누락·무효 또는 현재 계정/역할 불일치 |
 | 403 | `ACCESS_DENIED` | `FARM` 역할이 아님 |
-| 403 | `FARM_APPROVAL_REQUIRED` | 농가 프로필이 승인 상태가 아님 |
 | 404 | `USER_NOT_FOUND` | 보안 필터 통과 직후 계정이 사라진 경쟁 상황을 서비스가 다시 방어 |
 | 404 | `FARM_PROFILE_NOT_FOUND` | 계정에 연결된 농가 프로필을 찾을 수 없음 |
 

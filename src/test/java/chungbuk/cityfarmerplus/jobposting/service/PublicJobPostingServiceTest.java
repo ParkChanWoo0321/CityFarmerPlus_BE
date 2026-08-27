@@ -217,17 +217,19 @@ class PublicJobPostingServiceTest {
     }
 
     @Test
-    void postingFromUnapprovedFarmIsNeverPublic() {
+    void postingFromUnapprovedFarmRemainsPublicAfterPostingApproval() {
         JobPosting posting = posting(10L, JobPosting.JobPostingStatus.OPEN, true);
-        when(posting.getFarmProfile().getStatus())
+        lenient().when(posting.getFarmProfile().getStatus())
                 .thenReturn(FarmProfile.FarmProfileStatus.PENDING_REVIEW);
         when(postingRepository.findById(10L)).thenReturn(Optional.of(posting));
+        when(applicationRepository.findByJobPostingIdAndUrbanFarmerId(10L, 20L))
+                .thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.getPosting(20L, 10L, true))
-                .isInstanceOf(JobPostingException.class);
+        var response = service.getPosting(20L, 10L, true);
 
-        verify(applicationRepository, never())
-                .findByJobPostingIdAndUrbanFarmerId(any(), any());
+        assertThat(response.acceptingApplications()).isTrue();
+        verify(applicationRepository)
+                .findByJobPostingIdAndUrbanFarmerId(10L, 20L);
     }
 
     @Test

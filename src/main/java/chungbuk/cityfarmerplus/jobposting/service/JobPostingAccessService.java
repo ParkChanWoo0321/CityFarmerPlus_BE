@@ -26,6 +26,14 @@ public class JobPostingAccessService {
     }
 
     public FarmProfile requireApprovedFarmForUpdate(Long userId) {
+        FarmProfile profile = requireFarmProfileForUpdate(userId);
+        if (profile.getStatus() != FarmProfile.FarmProfileStatus.APPROVED) {
+            throw JobPostingException.farmApprovalRequired();
+        }
+        return profile;
+    }
+
+    public FarmProfile requireFarmProfileForUpdate(Long userId) {
         User user = userRepository.findByIdForUpdate(userId)
                 .orElseThrow(AuthException::userNotFound);
         if (!user.isActive()) {
@@ -34,12 +42,8 @@ public class JobPostingAccessService {
         if (user.getUserType() != User.UserType.FARM) {
             throw FarmProfileException.farmRoleRequired();
         }
-        FarmProfile profile = farmProfileRepository.findByOwnerIdForUpdate(userId)
+        return farmProfileRepository.findByOwnerIdForUpdate(userId)
                 .orElseThrow(FarmProfileException::profileNotFound);
-        if (profile.getStatus() != FarmProfile.FarmProfileStatus.APPROVED) {
-            throw JobPostingException.farmApprovalRequired();
-        }
-        return profile;
     }
 
     public FarmProfile requireFarmProfile(Long userId) {
