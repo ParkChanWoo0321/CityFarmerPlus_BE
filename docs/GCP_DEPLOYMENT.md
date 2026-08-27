@@ -38,6 +38,7 @@ GCP 무료 한도를 사용하려면 활성 결제 계정이 필요하다. 결�
 - Cloud Build는 무료 대상인 기본 풀 `e2-standard-2`를 사용한다. 결제 계정당 월 2,500 build-minutes까지 무료다.
 - Artifact Registry에는 전용 repository 정리 정책을 적용해 최근 이미지 한 개만 남긴다. 무료 저장공간은 결제 계정당 0.5 GiB다.
 - Secret Manager는 DB/JWT/KAMIS용 다섯 개의 활성 secret version만 유지한다. 무료 한도는 활성 version 6개와 월 10,000회 access다.
+- Cloud Scheduler의 `cityfarmerplus-db-keepalive` 작업 하나가 매시간 `/health`를 호출한다. 결제 계정당 월 3개 작업까지 무료이며 실행 횟수별 Scheduler 요금은 없지만, 호출로 발생하는 Cloud Run 사용량은 별도 집계된다.
 - Cloud SQL, Serverless VPC Access connector, 최소 인스턴스 1 이상은 만들지 않는다.
 - 외부 MySQL 제공자의 무료 한도와 만료 정책은 별도로 확인한다.
 
@@ -360,15 +361,15 @@ export SERVICE_URL="$(gcloud run services describe "$SERVICE" \
 curl -i "${SERVICE_URL}/health"
 ```
 
-정상 응답은 `200`과 `{"status":"UP"}`이다. `/health`는 HTTP 프로세스만 확인하며 DB와 GCS 연결 성공을 증명하지 않는다.
+정상 응답은 `200`과 `{"status":"UP","database":"UP"}`이다. `/health`는 애플리케이션과 DB `SELECT 1` 준비 상태를 확인하지만 GCS 업로드·다운로드 성공까지 증명하지는 않는다.
 
-512 MiB는 비용 최소화를 위한 시작값이다. 배포 로그에서 메모리 종료가 확인되면 기능을 줄이거나 1 GiB로 올려야 한다. 저트래픽에서는 1 GiB도 무료 한도 안에 머물 수 있지만 무료 한도 소진 속도는 더 빨라진다.
+현재 운영값은 `1 vCPU`, `2 GiB`, 동시 실행 `1`, 최소 인스턴스 `0`, 최대 인스턴스 `1`이다. Spring Boot 통합 애플리케이션이 더 작은 메모리에서 기동 실패한 기록을 반영한 값이며, 무료 한도를 넘으면 과금될 수 있으므로 실제 활성 시간과 비용 알림을 함께 확인한다.
 
 저장소에 포함된 `gcp/bootstrap.sh`는 이 문서의 API·서비스 계정·전용 bucket·Secret 껍데기 생성을 멱등 실행한다. `gcp/deploy.sh`는 clean `main`이 최신 `origin/main`과 같은지 확인하고 secret의 숫자 version을 고정해 최초 수동 배포를 수행한다.
 
 ```bash
 bash gcp/bootstrap.sh
-# 네 개 secret version을 안전하게 입력한 다음
+# 다섯 개 secret version을 안전하게 입력한 다음
 bash gcp/deploy.sh
 ```
 
@@ -435,10 +436,52 @@ KAMIS secret이 Cloud Run에 연결돼 있다는 사실만으로 시세 API가 �
 
 JWT secret 또는 issuer를 바꾸면 기존 토큰은 무효가 되므로 사용자는 다시 로그인해야 한다.
 
-## 11. 운영 주의사항
+## 11. Aiven 무료 DB keepalive
+
+Aiven 무료 MySQL은 지속적인 활동이 없으면 자동으로 꺼질 수 있다. Cloud Run도 `min=0`이므로 DB가 꺼진 뒤 새 인스턴스가 기동하면 DNS·연결 실패로 배포와 요청이 함께 실패한다. 이를 막기 위해 다음 Scheduler 작업 하나를 유지한다.
+
+| 항목 | 운영값 |
+|---|---|
+| 이름 / 리전 | `cityfarmerplus-db-keepalive` / `us-west1` |
+| 일정 / 시간대 | `0 * * * *` / `Asia/Seoul` |
+| 대상 | `GET https://cityfarmerplus-api-82951616760.us-west1.run.app/health` |
+| 인증 | 없음. 현재 `/health`는 공개 readiness endpoint |
+
+최초 한 번 생성할 때는 다음을 실행한다.
+
+```bash
+gcloud services enable cloudscheduler.googleapis.com \
+  --project="project-60a7cf7e-b36a-406b-b9e"
+
+gcloud scheduler jobs create http cityfarmerplus-db-keepalive \
+  --project="project-60a7cf7e-b36a-406b-b9e" \
+  --location="us-west1" \
+  --schedule="0 * * * *" \
+  --time-zone="Asia/Seoul" \
+  --uri="https://cityfarmerplus-api-82951616760.us-west1.run.app/health" \
+  --http-method="GET" \
+  --description="Keep Aiven free MySQL active through Cloud Run DB readiness"
+```
+
+생성 직후 수동 실행하고 성공 상태를 확인한다.
+
+```bash
+gcloud scheduler jobs run cityfarmerplus-db-keepalive \
+  --project="project-60a7cf7e-b36a-406b-b9e" \
+  --location="us-west1"
+
+gcloud scheduler jobs describe cityfarmerplus-db-keepalive \
+  --project="project-60a7cf7e-b36a-406b-b9e" \
+  --location="us-west1" \
+  --format="yaml(state,lastAttemptTime,status)"
+```
+
+Scheduler는 꺼진 Aiven 서비스를 직접 다시 켜지는 못한다. 작업이 실패하면 Aiven을 `Running`으로 복구하고 `/health`가 DB 포함 `UP`인지 확인한다.
+
+## 12. 운영 주의사항
 
 - Cloud Run request-based CPU와 `min=0`에서는 요청이 없을 때 `@Scheduled` 작업 실행이 보장되지 않는다. 현재 파일 삭제 재시도 worker는 best-effort다.
-- 무료 운영에서는 keep-alive용 주기 ping을 두지 않는다. 인위적인 요청은 scale-to-zero를 방해하고 무료 사용량을 소비한다.
+- 시간당 keepalive는 호출이 끝나면 다시 scale-to-zero할 수 있으며 월 약 720회 요청이다. 불필요하게 주기를 더 짧게 만들지 않고 Cloud Run 무료 사용량과 비용 알림을 함께 확인한다.
 - Cloud Run HTTP/1 요청 한도에 맞춰 multipart 전체 요청 크기는 31MB로 제한한다.
 - 현재 Spring Boot 런타임은 512MiB에서 메모리 한도를 초과했으므로 운영 기준을 2GiB로 유지한다. 이 설정은 1 vCPU의 요청 기반 무료 CPU·RAM 할당량을 약 50시간의 활성 시간까지 균형 있게 사용한다.
 - 외부 MySQL의 IP allowlist가 고정 IP만 허용하면 Cloud Run에서 연결되지 않을 수 있다.
@@ -451,7 +494,7 @@ JWT secret 또는 issuer를 바꾸면 기존 토큰은 무효가 되므로 사�
 - 비용 알림을 설정해도 리소스는 자동 중지되지 않는다.
 - Cloud Storage soft delete를 껐으므로 앱에서 삭제한 파일은 복구할 수 없다.
 
-## 12. 공식 문서
+## 13. 공식 문서
 
 - [Cloud Run container contract](https://docs.cloud.google.com/run/docs/container-contract)
 - [Cloud Run pricing](https://cloud.google.com/run/pricing)
@@ -465,5 +508,7 @@ JWT secret 또는 issuer를 바꾸면 기존 토큰은 무효가 되므로 사�
 - [Artifact Registry cleanup policy](https://docs.cloud.google.com/artifact-registry/docs/repositories/cleanup-policy)
 - [Artifact Registry pricing](https://cloud.google.com/artifact-registry/pricing)
 - [Secret Manager pricing](https://cloud.google.com/secret-manager/pricing)
+- [Cloud Scheduler pricing](https://cloud.google.com/scheduler/pricing)
+- [Cloud Scheduler quickstart](https://docs.cloud.google.com/scheduler/docs/schedule-run-cron-job)
 - [Aiven for MySQL free tier](https://aiven.io/docs/products/mysql/concepts/mysql-free-tier)
 - [Aiven MySQL power cycle](https://aiven.io/docs/products/mysql/howto/power-cycle-service)

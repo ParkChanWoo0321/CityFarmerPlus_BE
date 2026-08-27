@@ -70,8 +70,8 @@
 - 통합 계약: [전체 API 명세](docs/FULL_API_SPEC.md)
 - 노션 복사용 기능별 문서: [기능별 API 명세](docs/notion/README.md)
 - GCP Cloud Run 배포: [GCP 배포 가이드](docs/GCP_DEPLOYMENT.md)
-- 2026-08-21 기준 비즈니스 Controller 21개, HTTP API 66개를 코드와 문서에서 대조했습니다. 배포 liveness endpoint인 `GET /health`는 별도입니다.
-- 전체 테스트 결과: 347건, 실패 0건, 오류 0건, 스킵 3건
+- 2026-08-27 기준 HTTP 매핑 110개(사용자·공개·health 68개 + 관리자 42개)를 코드와 문서에서 대조했습니다.
+- 전체 테스트 결과: 392건, 실패 0건, 오류 0건, 스킵 3건
 
 검증 명령:
 
