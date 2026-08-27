@@ -405,7 +405,17 @@ bash gcp/bootstrap.sh
 bash gcp/deploy.sh
 ```
 
-두 스크립트는 이 프로젝트 ID와 `us-west1` 전용이다. 최초 배포자는 프로젝트 Owner이거나 API/Artifact Registry/Storage/IAM/Secret Manager/Cloud Build/Cloud Run을 만들고 공개 서비스 IAM을 설정할 동등한 권한이 있어야 한다. 이후 `main` trigger가 구성되면 `deploy.sh`를 동시에 실행해 같은 커밋을 중복 빌드하지 않는다.
+두 스크립트는 이 프로젝트 ID와 `us-west1` 전용이다. 최초 배포자는 프로젝트 Owner이거나 API/Artifact Registry/Storage/IAM/Secret Manager/Cloud Build/Cloud Run을 만들고 공개 서비스 IAM을 설정할 동등한 권한이 있어야 한다. 최소 권한의 수동 배포자는 build source bucket에 `roles/storage.objectUser`도 필요하다. 자동 배포와 `deploy.sh`는 해당 bucket의 동일한 generation 조건부 lock을 사용하므로 트래픽 전환은 직렬화된다. 이미 다른 배포가 실행 중이면 후발 배포는 운영 트래픽을 바꾸지 않고 종료한다.
+
+프로세스가 강제 종료되어 lock만 남은 경우에는 Cloud Build와 수동 배포가 모두 종료됐는지 먼저 확인한다. 그 다음 lock의 현재 generation을 조회하고 같은 generation에만 조건부 삭제를 수행한다. 실행 중인 배포가 있거나 generation이 바뀌었다면 삭제하지 않는다.
+
+```bash
+export DEPLOY_LOCK_URI="gs://${BUILD_SOURCE_BUCKET}/deploy-locks/${SERVICE}.lock"
+export DEPLOY_LOCK_GENERATION="$(gcloud storage objects describe "$DEPLOY_LOCK_URI" \
+  --format='value(generation)')"
+gcloud storage rm "$DEPLOY_LOCK_URI" \
+  --if-generation-match="$DEPLOY_LOCK_GENERATION"
+```
 
 ## 9. main 자동 배포
 
@@ -414,7 +424,7 @@ bash gcp/deploy.sh
 1. 브랜치가 `main`인지 확인한다.
 2. 전체 Gradle 테스트를 실행한다.
 3. Docker 이미지를 빌드하고 Artifact Registry에 push한다.
-4. 이미 만들어진 Cloud Run 서비스의 이미지와 허용 프론트 Origin을 build ID가 포함된 고유 0% candidate revision으로 갱신한다.
+4. generation 조건부 배포 lock을 획득한 뒤, 이미 만들어진 Cloud Run 서비스의 이미지와 허용 프론트 Origin을 build ID가 포함된 고유 0% candidate revision으로 갱신한다.
 5. candidate URL에서 `/health`와 KAMIS 실제 조회를 검사한다.
 6. GitHub `main`이 이 빌드 commit과 여전히 같은지 확인한다. 더 최신 commit이 있으면 오래된 빌드는 승격하지 않는다.
 7. 검사와 commit 확인이 성공한 정확한 candidate revision에만 100% 트래픽을 전환하고 안정 URL을 다시 검사한다. 전환 이후 실패·중단이 발생하면 직전 100% revision으로 자동 롤백하고 health를 재검증한다.
