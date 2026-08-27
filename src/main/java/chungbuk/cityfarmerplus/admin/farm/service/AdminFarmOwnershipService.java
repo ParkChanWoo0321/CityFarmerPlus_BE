@@ -31,7 +31,11 @@ public class AdminFarmOwnershipService {
 
     @Transactional(readOnly = true)
     public List<FarmProfileResponse> list(FarmProfile.FarmProfileStatus status) {
-        return farmProfileRepository.findAllByStatusOrderByUpdatedAtDesc(status)
+        List<FarmProfile> profiles = status == null
+                ? farmProfileRepository.findAllByOrderByUpdatedAtDesc()
+                : farmProfileRepository.findAllByStatusOrderByUpdatedAtDesc(status);
+
+        return profiles
                 .stream()
                 .map(FarmProfileResponse::from)
                 .toList();

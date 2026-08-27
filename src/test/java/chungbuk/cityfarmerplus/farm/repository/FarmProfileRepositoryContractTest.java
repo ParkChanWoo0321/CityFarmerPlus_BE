@@ -71,6 +71,22 @@ class FarmProfileRepositoryContractTest {
         assertThat(method.getReturnType()).isEqualTo(long.class);
     }
 
+    @Test
+    void adminListsFetchOwnerAndReviewerForAllAndFilteredQueries() throws Exception {
+        Method all = FarmProfileRepository.class.getMethod(
+                "findAllByOrderByUpdatedAtDesc"
+        );
+        Method filtered = FarmProfileRepository.class.getMethod(
+                "findAllByStatusOrderByUpdatedAtDesc",
+                FarmProfile.FarmProfileStatus.class
+        );
+
+        assertReviewEntityGraph(all);
+        assertReviewEntityGraph(filtered);
+        assertThat(all.getReturnType()).isEqualTo(List.class);
+        assertThat(filtered.getReturnType()).isEqualTo(List.class);
+    }
+
     private void assertReviewEntityGraph(Method method) {
         EntityGraph graph = method.getAnnotation(EntityGraph.class);
 
