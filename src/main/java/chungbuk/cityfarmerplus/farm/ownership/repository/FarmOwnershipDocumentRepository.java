@@ -18,5 +18,15 @@ public interface FarmOwnershipDocumentRepository
     })
     Optional<FarmOwnershipDocument> findById(Long id);
 
+    @EntityGraph(attributePaths = {
+            "submission",
+            "submission.farmProfile",
+            "submission.farmProfile.owner"
+    })
+    Optional<FarmOwnershipDocument> findByIdAndSubmissionFarmProfileId(
+            Long documentId,
+            Long profileId
+    );
+
     List<FarmOwnershipDocument> findAllBySubmissionFarmProfileOwnerId(Long ownerUserId);
 }

@@ -45,7 +45,7 @@ public class ProxyRegistrationLog {
     private User targetUser;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "action_type", nullable = false, length = 30, updatable = false)
+    @Column(name = "action_type", nullable = false, length = 64, updatable = false)
     private ActionType actionType;
 
     @Enumerated(EnumType.STRING)

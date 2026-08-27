@@ -47,6 +47,7 @@ Authorization: Bearer {{adminAccessToken}}
 |---|---|---|---|---|
 | 이수증 제출 목록 조회 | `GET` | `/api/admin/education/submissions` | Bearer JWT (`ROLE_CENTER_ADMIN`) | `200 OK` |
 | 이수증 제출 상세 조회 | `GET` | `/api/admin/education/submissions/{submissionId}` | Bearer JWT (`ROLE_CENTER_ADMIN`) | `200 OK` |
+| 이수증 첨부 파일 다운로드 | `GET` | `/api/admin/education/submissions/{submissionId}/documents/{documentId}` | Bearer JWT (`ROLE_CENTER_ADMIN`) | `200 OK` |
 | 이수증 제출 승인 | `POST` | `/api/admin/education/submissions/{submissionId}/approve` | Bearer JWT (`ROLE_CENTER_ADMIN`) | `200 OK` |
 | 이수증 제출 반려 | `POST` | `/api/admin/education/submissions/{submissionId}/reject` | Bearer JWT (`ROLE_CENTER_ADMIN`) | `200 OK` |
 
@@ -357,10 +358,18 @@ HTTP/1.1 200 OK
 
 `PENDING_REVIEW` 상태에서만 승인·반려가 가능하며, 그 외 상태에서 시도하면 `409 INVALID_EDUCATION_SUBMISSION_STATUS`로 거부된다.
 
-## 10. 현재 범위 밖 또는 미구현 기능
+## 10. 이수증 첨부 파일 다운로드
+
+상세 응답의 `documents[].id`를 `documentId`로 사용한다. 문서가 반드시 URL의 `submissionId`에 속해야 하며, 다른 제출의 문서 ID를 조합하면 `404 EDUCATION_DOCUMENT_NOT_FOUND`를 반환한다. 성공 시 저장소의 원본을 스트리밍하고 `Content-Type`, `Content-Length`, UTF-8 파일명이 포함된 `Content-Disposition: attachment`를 반환한다.
+
+```http
+GET /api/admin/education/submissions/{submissionId}/documents/{documentId}
+Authorization: Bearer {{adminAccessToken}}
+```
+
+## 11. 현재 범위 밖 또는 미구현 기능
 
 - 목록 조회 상태 필터(현재 `PENDING_REVIEW` 고정), 과정별·도시농부별 검색
 - 승인·반려 취소 또는 재심사(한 번 전이하면 되돌릴 수 없음)
-- 이수증 첨부 파일 다운로드(별도 `EducationDocumentDownloadService`/API 영역, 이 문서 범위 밖)
 - 교육 과정 관리(등록·수정·비활성화) CRUD API — [`ADMIN_EDUCATION_COURSE_API_SPEC.md`](ADMIN_EDUCATION_COURSE_API_SPEC.md)에서 별도로 구현됨
 - 여러 제출 건 일괄 승인·반려

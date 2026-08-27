@@ -4,11 +4,16 @@ import chungbuk.cityfarmerplus.admin.education.dto.EducationApproveRequest;
 import chungbuk.cityfarmerplus.admin.education.dto.EducationRejectRequest;
 import chungbuk.cityfarmerplus.admin.education.service.AdminEducationSubmissionService;
 import chungbuk.cityfarmerplus.common.web.AuthenticatedUser;
+import chungbuk.cityfarmerplus.common.web.PageResponse;
 import chungbuk.cityfarmerplus.education.dto.EducationSubmissionResponse;
+import chungbuk.cityfarmerplus.education.service.EducationDocumentDownloadService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.core.io.Resource;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -19,6 +24,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.nio.charset.StandardCharsets;
+
 @RestController
 @RequestMapping("/api/admin/education/submissions")
 @RequiredArgsConstructor
@@ -26,10 +33,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminEducationSubmissionController {
 
     private final AdminEducationSubmissionService submissionService;
+    private final EducationDocumentDownloadService documentDownloadService;
 
     @GetMapping
-    public ResponseEntity<Page<EducationSubmissionResponse>> list(Pageable pageable) {
-        return ResponseEntity.ok(submissionService.list(pageable));
+    public ResponseEntity<PageResponse<EducationSubmissionResponse>> list(Pageable pageable) {
+        return ResponseEntity.ok(PageResponse.from(
+                submissionService.list(pageable),
+                response -> response
+        ));
     }
 
     @GetMapping("/{submissionId}")
@@ -37,6 +48,23 @@ public class AdminEducationSubmissionController {
             @PathVariable Long submissionId
     ) {
         return ResponseEntity.ok(submissionService.getDetail(submissionId));
+    }
+
+    @GetMapping("/{submissionId}/documents/{documentId}")
+    public ResponseEntity<Resource> downloadDocument(
+            @PathVariable Long submissionId,
+            @PathVariable Long documentId
+    ) {
+        EducationDocumentDownloadService.DownloadedEducationDocument document =
+                documentDownloadService.downloadForAdmin(submissionId, documentId);
+        ContentDisposition disposition = ContentDisposition.attachment()
+                .filename(document.originalFilename(), StandardCharsets.UTF_8)
+                .build();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .contentType(resolveContentType(document.contentType()))
+                .contentLength(document.sizeBytes())
+                .body(document.resource());
     }
 
     @PostMapping("/{submissionId}/approve")
@@ -63,5 +91,13 @@ public class AdminEducationSubmissionController {
                 submissionId,
                 request
         ));
+    }
+
+    private MediaType resolveContentType(String contentType) {
+        try {
+            return MediaType.parseMediaType(contentType);
+        } catch (IllegalArgumentException exception) {
+            return MediaType.APPLICATION_OCTET_STREAM;
+        }
     }
 }

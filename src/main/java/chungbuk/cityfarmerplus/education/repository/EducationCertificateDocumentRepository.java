@@ -18,6 +18,12 @@ public interface EducationCertificateDocumentRepository
             Long userId
     );
 
+    @EntityGraph(attributePaths = {"submission.certification.urbanFarmer"})
+    Optional<EducationCertificateDocument> findByIdAndSubmissionId(
+            Long documentId,
+            Long submissionId
+    );
+
     List<EducationCertificateDocument>
     findAllBySubmissionCertificationUrbanFarmerId(Long userId);
 }

@@ -44,4 +44,12 @@ public class JobPostingException extends DomainException {
     public static JobPostingException capacityBelowMatchedCount() {
         return new JobPostingException(HttpStatus.CONFLICT, "CAPACITY_BELOW_MATCHED_COUNT", "이미 확정된 인원보다 모집 인원을 적게 수정할 수 없습니다.");
     }
+
+    public static JobPostingException matchedPostingUpdateNotAllowed() {
+        return new JobPostingException(
+                HttpStatus.CONFLICT,
+                "MATCHED_POSTING_UPDATE_NOT_ALLOWED",
+                "이미 확정된 근무자가 있는 공고의 근무 조건은 수정할 수 없습니다."
+        );
+    }
 }

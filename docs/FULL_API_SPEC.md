@@ -2,11 +2,11 @@
 
 - 문서 기준일: 2026-08-26
 - 기준: 현재 저장소의 Controller, DTO, Security, Service 상태 검증 코드
-- 현재 HTTP 작업 수: 66개
+- 현재 HTTP 작업 수: 110개 (사용자·공개·health 68개 + 관리자 42개)
 - 로컬 기본 URL: http://localhost:8080
 - 시간 기준: 별도 표기가 없는 업무 시간 검증은 Asia/Seoul
 
-이 문서는 노션에 그대로 복사할 수 있는 현재 백엔드 통합 계약이다. 구현 예정 기능은 포함하지 않으며, 실제 코드에 존재하는 API와 현재 제한만 기록한다.
+이 문서는 노션에 그대로 복사할 수 있는 현재 백엔드 통합 계약이다. 사용자 API 상세는 이 문서에, 관리자 API 상세는 `API_SPEC_INDEX.md`가 연결하는 8개 `ADMIN_*_API_SPEC.md`에 기록한다. 구현 예정 기능은 현재 기능처럼 적지 않는다.
 
 ---
 
@@ -24,12 +24,12 @@ Authorization: Bearer {{accessToken}}
 |---|---|
 | URBAN_FARMER | 공고에 지원하고 근무하는 도시농부 |
 | FARM | 인력을 모집하는 농가 |
-| CENTER_ADMIN | backend-2 병합을 위해 유지하는 담당자 공통 역할 값 |
+| CENTER_ADMIN | 중개센터 담당자 |
 
 - 한 계정은 하나의 역할만 가진다.
 - 일반 회원가입으로 CENTER_ADMIN을 만들 수 없다.
-- backend-1에는 CENTER_ADMIN 계정 발급 API와 중개센터 전용 업무 API가 없다.
-- CENTER_ADMIN enum과 심사자 필드·심사 상태 전이는 backend-2 병합을 위한 공통 도메인 계약으로만 남아 있다.
+- CENTER_ADMIN 계정은 일반 회원가입으로 만들 수 없고, 운영 기본 비활성인 내부 발급 API로만 만든다.
+- `/api/admin/**`는 CENTER_ADMIN 역할을 URL 패턴과 서비스에서 다시 확인한다.
 - JWT의 sub는 회원 ID, role claim은 위 역할 값이다.
 - JWT가 있어도 계정이 ACTIVE가 아니거나 토큰 역할과 DB 역할이 다르면 401 INVALID_ACCOUNT가 반환된다.
 - 로그아웃은 서버 토큰 폐기가 아니라 클라이언트가 JWT를 삭제하는 stateless 방식이다.
@@ -46,7 +46,9 @@ Authorization: Bearer {{accessToken}}
 | GET | /api/job-postings/{postingId} |
 | GET | /api/support/faqs |
 | GET | /health |
-| OPTIONS | /api/**, /health |
+| GET | /health/live |
+| POST | /api/internal/center-admins (provisioning key가 설정된 동안만) |
+| OPTIONS | /** |
 
 위 표 이외의 API는 Bearer JWT가 필요하다. 공개 공고 조회는 JWT 없이 호출할 수 있고, 유효한 JWT를 함께 보내면 현재 사용자의 지원 정보가 응답에 추가된다. 공개 API라도 잘못된 Bearer JWT를 보내면 401을 반환한다.
 
@@ -194,7 +196,7 @@ accessToken, tokenType=Bearer, expiresInSeconds, user
 - 농가에 MATCHED 지원이 연결된 활성 공고가 있으면 탈퇴할 수 없다.
 - 탈퇴 가능한 농가의 미종결 공고는 CANCELLED, 남은 APPLIED 지원은 POSTING_CANCELLED, 농가 프로필은 INACTIVE가 된다.
 
-CENTER_ADMIN은 공개 회원가입에서 거절된다. backend-1에는 CENTER_ADMIN을 생성하거나 담당자 업무를 처리하는 HTTP API가 없다.
+CENTER_ADMIN은 공개 회원가입에서 거절된다. 내부 발급 API는 `ADMIN_PROVISIONING_KEY`가 비어 있으면 비활성화되고, 활성화 시 `X-Admin-Provisioning-Key`가 필요하다.
 
 ---
 
@@ -286,7 +288,7 @@ DRAFT만 물리 삭제 가능
 이미 CANCELLED가 아닌 신청 → CANCELLED
 ~~~
 
-`SUBMITTED → APPROVED/REJECTED` 전이와 심사 필드는 backend-2 병합용 공통 계약이다. backend-1에는 승인·반려 처리 API가 없으며, backend-1 단독 실행에서는 사용자가 `SUBMITTED`까지 전환할 수 있다.
+`SUBMITTED → APPROVED/REJECTED` 전이는 관리자 사업참여 심사 API가 처리한다. 상세 계약은 `ADMIN_PARTICIPATION_APPLICATION_API_SPEC.md`를 따른다.
 
 ### 4.2 디자인용 통합 신청 폼 API
 
@@ -339,7 +341,7 @@ EducationCourse 필드:
 | mandatory | 필수 과정 여부 |
 | displayOrder | 0~10000 |
 
-응답에는 id, active, version, createdAt, updatedAt도 포함된다. backend-1에는 과정 생성·수정·비활성화 API가 없다.
+응답에는 id, active, version, createdAt, updatedAt도 포함된다. 과정 생성·수정·비활성화는 `ADMIN_EDUCATION_COURSE_API_SPEC.md`의 관리자 API가 처리한다.
 
 ### 5.2 도시농부 교육 인증 API
 
@@ -394,7 +396,7 @@ REJECTED → 새 attempt로 재제출 가능
 
 과거 제출과 파일 메타데이터는 새 회차와 분리되어 보존된다.
 
-APPROVED, REJECTED와 reviewedByUserId, reviewedAt, recognizedHours, rejectionReason은 backend-2 병합용 공통 계약이다. backend-1에는 교육 심사·담당자 파일 다운로드 API가 없다. backend-2 심사 목록·건수는 `EducationCertificateSubmissionRepository.findAllByStatus`·`countByStatus`, 심사 잠금은 `findByIdForUpdate`를 사용해야 하며 세 쿼리는 모두 회원 상태가 ACTIVE인 제출만 반환한다.
+APPROVED, REJECTED와 reviewedByUserId, reviewedAt, recognizedHours, rejectionReason은 관리자 심사 API가 관리한다. 관리자 목록·상세·승인·반려·제출 범위 증빙 다운로드 계약은 `ADMIN_EDUCATION_SUBMISSION_API_SPEC.md`를 따른다.
 
 ---
 
@@ -459,7 +461,7 @@ REJECTED → 새 attempt로 재제출 가능
 APPROVED에서 소유 핵심정보 변경 → DRAFT
 ~~~
 
-APPROVED, REJECTED와 reviewerId, reviewerName, reviewedAt, rejectionReason은 backend-2 병합용 공통 계약이다. backend-1에는 농가 프로필 심사·담당자 증빙 다운로드 API가 없다. 회원 탈퇴 시 농가 프로필은 INACTIVE가 되어 PENDING_REVIEW 프로필 목록에서 제외되며, 비활성 소유자의 파일 다운로드도 차단된다.
+APPROVED, REJECTED와 reviewerId, reviewerName, reviewedAt, rejectionReason은 관리자 심사 API가 관리한다. 관리자 목록·상세·승인·반려·프로필 범위 증빙 다운로드 계약은 `ADMIN_FARM_OWNERSHIP_API_SPEC.md`를 따른다. 회원 탈퇴 시 농가 프로필은 INACTIVE가 되어 PENDING_REVIEW 목록에서 제외된다.
 
 ---
 
@@ -544,7 +546,7 @@ JobPostingUpsertRequest:
 
 농가용 JobPostingResponse는 공통 입력 필드와 함께 farmProfileId, farmName, cityCounty, farmAddress, contactNumber, status, displayStatus, reviewRequestedAt, approvedAt, closedAt, cancelledAt, createdAt, updatedAt, latestReviewAction, latestReviewReason, latestReviewedAt을 반환한다. DB 상태가 아직 OPEN이어도 작업 시작 시각이 지났다면 화면용 displayStatus는 CLOSED다.
 
-PENDING_REVIEW 이후 승인·반려·마감 처리와 `JobPostingReview`의 관리자 작성 이력은 backend-2 병합용 공통 계약이다. backend-1에는 해당 처리 API가 없다.
+PENDING_REVIEW 이후 승인·반려·마감·수정·취소와 `JobPostingReview` 이력은 `ADMIN_JOB_POSTING_API_SPEC.md`의 관리자 API가 처리한다.
 
 ### 8.4 공고 조회
 
@@ -630,7 +632,7 @@ applicationId, urbanFarmerUserId, name, phoneNumber, status, farmOpinion, farmOp
 
 APPLIED, WITHDRAWN, MATCHED, NOT_MATCHED, POSTING_CANCELLED, NO_SHOW, WORK_COMPLETED
 
-MATCHED, NOT_MATCHED와 confirmedBy·matchedAt 필드는 backend-2 병합용 공통 계약이다. backend-1에는 후보 필터링·최종 매칭 API가 없으며, 농가의 PREFERRED/NOT_PREFERRED 의견만으로 지원 상태가 확정되지 않는다.
+MATCHED, NOT_MATCHED와 confirmedBy·matchedAt 필드는 관리자 최종 매칭 API가 관리한다. 농가의 PREFERRED/NOT_PREFERRED 의견만으로 지원 상태가 확정되지는 않는다.
 
 ---
 
@@ -676,7 +678,7 @@ workAssignmentId, workSummary, officialPrecautions, preparationChecklist, recomm
 - status는 PRESENT 또는 ABSENT다. NOT_RECORDED 요청은 거절된다.
 - 최초 등록은 `SCHEDULED` + `NOT_RECORDED`에서만 상태를 변경한다.
 - 같은 농가 소유자가 이미 등록된 것과 같은 `PRESENT`/`ABSENT`를 재시도하면 `200`과 현재 배정을 반환한다. 출결·근무·지원 상태와 기존 기록 시각·기록자는 변경하지 않는다.
-- 이미 등록된 값과 다른 상태로의 변경 요청은 `INVALID_WORK_ASSIGNMENT_STATE`(409)다. backend-1에는 출결 정정 API가 없다.
+- 이미 등록된 값과 다른 상태로의 변경 요청은 `INVALID_WORK_ASSIGNMENT_STATE`(409)다. 정정은 CENTER_ADMIN 전용 근무 정정 API와 이력으로 처리한다.
 - ABSENT 등록 시 배정은 NO_SHOW, 지원은 NO_SHOW가 된다.
 - 근무 완료는 작업 종료 시각 이후이고 PRESENT인 SCHEDULED 배정만 가능하다.
 
@@ -692,7 +694,7 @@ backend-2 출결 정정 계약: NO_SHOW를 PRESENT로 정정 → SCHEDULED
 backend-2 공고 취소 계약 → CANCELLED
 ~~~
 
-해당 공고의 SCHEDULED 배정이 모두 사라지면 CLOSED 공고는 WORK_COMPLETED가 된다. 작업이 끝날 때까지 OPEN으로 남은 공고도 농가의 마지막 근무 완료 처리에서 먼저 CLOSED로 전환한 뒤 WORK_COMPLETED가 된다. 출결 정정과 정정 이력 모델은 공통 계약으로 남아 있지만 backend-1에는 관련 HTTP API가 없다.
+해당 공고의 SCHEDULED 배정이 모두 사라지면 CLOSED 공고는 WORK_COMPLETED가 된다. 작업이 끝날 때까지 OPEN으로 남은 공고도 농가의 마지막 근무 완료 처리에서 먼저 CLOSED로 전환한 뒤 WORK_COMPLETED가 된다. 관리자 출결 정정과 정정 이력은 `ADMIN_WORK_ASSIGNMENT_API_SPEC.md`를 따른다.
 
 ---
 
@@ -771,14 +773,9 @@ FARM 회원가입·로그인
 → 작업 종료 후 근무 완료 확정
 ~~~
 
-### 13.3 공통 계약 경계
+### 13.3 관리자 업무
 
-backend-1은 사용자 제출과 조회를 담당한다. CENTER_ADMIN enum, 심사자 필드, 승인·반려·매칭·출결 정정 상태는 backend-2 병합 시 동일한 DB 모델을 사용하기 위해 남아 있다. 그러나 현재 backend-1에는 다음 HTTP 경로가 전혀 없다.
-
-- 중개센터 전용 업무 경로
-- 내부 담당자 계정 발급 경로
-
-따라서 backend-1 단독 실행만으로 PENDING_REVIEW 이후 승인·반려, 공고 OPEN 전환, 최종 매칭, 출결 정정을 완료할 수 없다.
+통합 백엔드는 `/api/admin/**`에서 사업참여·교육·농가 소유 증빙 심사, 교육 과정 관리, 공고 심사·최종 매칭, 근무 정정, 대리 접수와 대시보드를 제공한다. 관리자 API 42개의 URL·입력·오류·상태 전이는 `API_SPEC_INDEX.md`의 8개 관리자 전용 명세를 기준으로 한다. 내부 담당자 발급 경로는 운영 기본 비활성이고 일반 회원가입과 분리된다.
 
 ---
 
@@ -797,7 +794,6 @@ backend-1은 사용자 제출과 조회를 담당한다. CENTER_ADMIN enum, 심�
 
 현재 코드에 없는 기능:
 
-- 모든 중개센터 전용 업무 API와 담당자 내부 계정 발급 API
 - 지도 좌표·지도 URL·지도 공급자 연동
 - 농산물 시세 외부 데이터 연동
 - 실제 LLM 공급자 호출

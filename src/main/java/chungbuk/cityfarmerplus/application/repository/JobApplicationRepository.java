@@ -39,6 +39,19 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
             JobApplication.ApplicationStatus status
     );
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select application
+            from JobApplication application
+            where application.jobPosting.id = :jobPostingId
+              and application.status = :status
+            order by application.id
+            """)
+    List<JobApplication> findByJobPostingIdAndStatusForUpdate(
+            @Param("jobPostingId") Long jobPostingId,
+            @Param("status") JobApplication.ApplicationStatus status
+    );
+
     boolean existsByJobPostingIdAndStatus(
             Long jobPostingId,
             JobApplication.ApplicationStatus status

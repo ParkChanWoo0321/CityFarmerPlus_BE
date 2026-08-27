@@ -48,6 +48,7 @@ Authorization: Bearer {{adminAccessToken}}
 |---|---|---|---|---|
 | 농가 프로필 목록 조회(상태 필터) | `GET` | `/api/admin/farm-profiles?status=` | Bearer JWT (`ROLE_CENTER_ADMIN`) | `200 OK` |
 | 농가 소유 증빙 상세 조회 | `GET` | `/api/admin/farm-profiles/{profileId}` | Bearer JWT (`ROLE_CENTER_ADMIN`) | `200 OK` |
+| 농가 소유 증빙 파일 다운로드 | `GET` | `/api/admin/farm-profiles/{profileId}/ownership/documents/{documentId}` | Bearer JWT (`ROLE_CENTER_ADMIN`) | `200 OK` |
 | 농가 소유 증빙 승인 | `POST` | `/api/admin/farm-profiles/{profileId}/ownership/approve` | Bearer JWT (`ROLE_CENTER_ADMIN`) | `200 OK` |
 | 농가 소유 증빙 반려 | `POST` | `/api/admin/farm-profiles/{profileId}/ownership/reject` | Bearer JWT (`ROLE_CENTER_ADMIN`) | `200 OK` |
 
@@ -341,10 +342,18 @@ HTTP/1.1 200 OK
 - `FarmProfileRepository.findByIdForUpdate(Long id)`: `profileId` 기준 비관적 락 조회(`PESSIMISTIC_WRITE`). 기존 `findByOwnerIdForUpdate`(농가 본인용, `ownerId` 기준)와 별개로, 관리자가 `profileId`로 직접 접근하는 용도로 추가했다. `owner_user_id`는 `updatable = false` + 유니크 제약으로 프로필 생성 후 절대 바뀌지 않는 값이라, 두 락 메서드가 서로 다른 키로 같은 행을 잠가도 안전하다.
 - `FarmProfileRepository.findAllByStatusOrderByUpdatedAtDesc(FarmProfileStatus status)`: 3장 목록 조회용 파생 쿼리.
 
-## 10. 현재 범위 밖 또는 미구현 기능
+## 10. 농가 소유 증빙 파일 다운로드
+
+최신 제출 상세 응답의 `documents[].id`를 `documentId`로 사용한다. 문서가 반드시 URL의 `profileId`에 속해야 하며, 다른 농가의 문서 ID를 조합하면 `404 OWNERSHIP_DOCUMENT_NOT_FOUND`를 반환한다. 성공 시 저장소의 원본을 스트리밍하고 `Content-Type`, `Content-Length`, UTF-8 파일명이 포함된 `Content-Disposition: attachment`를 반환한다.
+
+```http
+GET /api/admin/farm-profiles/{profileId}/ownership/documents/{documentId}
+Authorization: Bearer {{adminAccessToken}}
+```
+
+## 11. 현재 범위 밖 또는 미구현 기능
 
 - 목록 조회 페이지네이션, 지역(`cityCounty`)·검색어 필터
 - 승인·반려 취소 또는 재심사(한 번 전이하면 되돌릴 수 없음)
-- 소유 증빙 첨부 파일 다운로드(별도 `FarmOwnershipQueryService.download`/API 영역, 이 문서 범위 밖)
 - 여러 농가 프로필 일괄 승인·반려
 - 도시농부 사업참여 심사([`ADMIN_PARTICIPATION_APPLICATION_API_SPEC.md`](./ADMIN_PARTICIPATION_APPLICATION_API_SPEC.md)) · 교육 이수증 심사([`ADMIN_EDUCATION_SUBMISSION_API_SPEC.md`](./ADMIN_EDUCATION_SUBMISSION_API_SPEC.md))와 달리, 이 기능은 프로필과 제출 두 엔티티를 함께 갱신하므로 향후 유사 도메인(예: 농산물 인증 등)을 추가할 때도 "두 엔티티 동시 갱신 + 같은 트랜잭션" 패턴을 참고할 것

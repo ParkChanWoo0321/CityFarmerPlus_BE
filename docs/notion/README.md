@@ -1,9 +1,9 @@
 # CityFarmerPlus 기능별 API 명세서
 
-- 기준일: 2026-08-20
-- 기준: 현재 `backend-1` 작업 폴더의 구현 코드
-- Controller: 21개 (예외 처리 Advice 제외)
-- HTTP API: 66개 (`OPTIONS` preflight 제외)
+- 기준일: 2026-08-27
+- 기준: backend-1 + backend-2 통합 구현 코드
+- 전체 HTTP API: 110개 (`OPTIONS` preflight 제외)
+- 이 폴더의 사용자 API 문서: 66개. 관리자 42개와 health 2개는 아래 별도 문서 참조
 
 각 문서는 다른 문서 없이도 노션 페이지 하나에 그대로 복사할 수 있도록 작성했다.
 
@@ -30,6 +30,17 @@
 | 15 | AI 행정 상담 | 2 | [15_AI_SUPPORT.md](15_AI_SUPPORT.md) |
 |  | **합계** | **66** |  |
 
+관리자 API는 저장소 `docs` 루트의 다음 문서를 노션에 각각 복사한다.
+
+- `ADMIN_DASHBOARD_API_SPEC.md`
+- `ADMIN_PARTICIPATION_APPLICATION_API_SPEC.md`
+- `ADMIN_EDUCATION_COURSE_API_SPEC.md`
+- `ADMIN_EDUCATION_SUBMISSION_API_SPEC.md`
+- `ADMIN_FARM_OWNERSHIP_API_SPEC.md`
+- `ADMIN_JOB_POSTING_API_SPEC.md`
+- `ADMIN_WORK_ASSIGNMENT_API_SPEC.md`
+- `ADMIN_PROXY_REGISTRATION_API_SPEC.md`
+
 ## 노션에 복사하는 방법
 
 1. 노션에서 기능별 새 페이지를 만든다.
@@ -41,7 +52,7 @@
 
 - 현재 코드에 존재하는 HTTP API만 기록했다.
 - 통합 신청 폼 3개는 디자인의 단일 화면을 위한 트랜잭션 API다. 기존 프로필 3개, 희망 근무 조건 3개, 사업참여 신청 7개 API도 삭제되지 않고 독립 API로 유지된다.
-- backend-1에서 제거한 중개센터 계정 발급 및 `/api/admin/**` API는 기록하지 않았다.
-- `CENTER_ADMIN`과 승인·반려 상태는 backend-2 병합을 위한 공통 데이터 계약으로만 설명한다.
+- 이 폴더의 00~15 문서는 사용자 API만 다루며, 구현된 `/api/admin/**` 42개는 위 8개 관리자 전용 명세가 정본이다.
+- `CENTER_ADMIN`과 승인·반려 상태는 통합 코드에서 실제 관리자 API로 처리한다.
 - 소셜 로그인, 알림, 정산·CSV, 결제 기능은 확정 제외 범위다.
-- 이 문서는 2026-08-20 기준 `backend-1` 커밋의 API 계약을 반영한다. 이후 API 변경 시 관련 문서를 함께 갱신한다.
+- 이 인덱스는 2026-08-27 통합 코드의 문서 분할 구조를 반영한다. 이후 API 변경 시 관련 사용자 또는 관리자 명세를 함께 갱신한다.

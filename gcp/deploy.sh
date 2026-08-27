@@ -55,6 +55,7 @@ DB_URL_VERSION="$(latest_enabled_version cityfarmerplus-db-url)"
 DB_USERNAME_VERSION="$(latest_enabled_version cityfarmerplus-db-username)"
 DB_PASSWORD_VERSION="$(latest_enabled_version cityfarmerplus-db-password)"
 JWT_SECRET_VERSION="$(latest_enabled_version cityfarmerplus-jwt-secret)"
+KAMIS_API_KEY_VERSION="$(latest_enabled_version cityfarmerplus-kamis-api-key)"
 
 COMMIT_SHA="$(git rev-parse HEAD)"
 SHORT_SHA="$(git rev-parse --short=7 HEAD)"
@@ -102,9 +103,9 @@ gcloud run deploy "${SERVICE}" \
   --timeout=300 \
   --cpu-throttling \
   --env-vars-file="${ENV_FILE}" \
-  --set-secrets="DB_URL=cityfarmerplus-db-url:${DB_URL_VERSION},DB_USERNAME=cityfarmerplus-db-username:${DB_USERNAME_VERSION},DB_PASSWORD=cityfarmerplus-db-password:${DB_PASSWORD_VERSION},JWT_SECRET=cityfarmerplus-jwt-secret:${JWT_SECRET_VERSION}" \
+  --set-secrets="DB_URL=cityfarmerplus-db-url:${DB_URL_VERSION},DB_USERNAME=cityfarmerplus-db-username:${DB_USERNAME_VERSION},DB_PASSWORD=cityfarmerplus-db-password:${DB_PASSWORD_VERSION},JWT_SECRET=cityfarmerplus-jwt-secret:${JWT_SECRET_VERSION},KAMIS_API_KEY=cityfarmerplus-kamis-api-key:${KAMIS_API_KEY_VERSION}" \
   --startup-probe="httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=0,failureThreshold=24,timeoutSeconds=2,periodSeconds=10" \
-  --liveness-probe="httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=0,failureThreshold=3,timeoutSeconds=2,periodSeconds=30"
+  --liveness-probe="httpGet.path=/health/live,httpGet.port=8080,initialDelaySeconds=0,failureThreshold=3,timeoutSeconds=2,periodSeconds=30"
 
 gcloud run services add-iam-policy-binding "${SERVICE}" \
   --project="${PROJECT_ID}" \
