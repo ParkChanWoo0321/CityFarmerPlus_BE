@@ -79,6 +79,8 @@ Cloud Run은 `PORT`를 주입한다. 애플리케이션은 `0.0.0.0:${PORT}`에 
 5. 실제 DB/JWT 값은 채팅, Git, 문서에 붙여 넣지 않고 사용자가 Cloud Shell 또는 GCP Console에 직접 입력한다.
 6. 외부 MySQL을 백업하고 현재 스키마와 애플리케이션 엔티티가 맞는지 확인한다. 운영 DB에는 `ddl-auto=update`를 사용하지 않는다.
 
+backend-2를 처음 배포할 때는 백업 후 `gcp/migrations/20260827_backend2_tables.sql`을 외부 MySQL에 한 번 적용한다. 이 migration은 대리 접수 감사 로그와 출결 정정 이력 테이블을 생성한다. 두 테이블이 조회되는 것을 확인한 뒤에만 `JPA_DDL_AUTO=validate` revision을 배포한다.
+
 로컬 PC에 `gcloud`가 없다면 무료 Cloud Shell에서 아래 명령을 실행할 수 있다.
 
 ```bash
@@ -380,7 +382,7 @@ Cloud Build trigger는 GCP Console에서 다음 값으로 만든다.
 | `_SERVICE` | `cityfarmerplus-api` |
 | `_TAG` | `$SHORT_SHA` |
 | `_DEPLOY` | `true` |
-| `_CORS_ALLOWED_ORIGINS` | 로컬 연동 중에는 `http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000`, 프론트 배포 후에는 실제 Origin 목록 |
+| `_CORS_ALLOWED_ORIGINS` | `https://cityfarmerplus.site,https://www.cityfarmerplus.site`와 필요한 로컬 개발 Origin 목록 |
 
 Trigger 위치와 배포 위치는 서로 다르다. Trigger는 별도 private pool이 필요 없는 `global` 기본 pool에서 실행하고, `_REGION=us-west1`을 통해 Artifact Registry와 Cloud Run은 `us-west1`에 배포한다.
 
