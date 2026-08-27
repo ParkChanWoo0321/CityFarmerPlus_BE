@@ -1,8 +1,9 @@
 # AI 모집 공고 문구 미리보기 API
 
 - 기준일: 2026-08-20
-- 기준: 현재 `backend-1` 코드
+- 기준: 현재 `main` 통합 코드
 - 로컬 Base URL: `http://localhost:8080`
+- 운영 Base URL: `https://cityfarmerplus-api-82951616760.us-west1.run.app`
 - API 수: 1개
 
 > 이 문서는 현재 `AiJobPostingController`, 요청/응답 DTO, `AiJobPostingService`, `RuleBasedJobPostingTextGenerator` 구현을 기준으로 작성했다.
@@ -120,5 +121,5 @@ curl -X POST "{{baseUrl}}/api/ai/job-posting-previews" \
 
 - 이름에 AI가 포함되지만 현재는 LLM이 아닌 규칙 기반 생성기다.
 - 생성 결과는 자동 저장·게시·승인 요청되지 않는다.
-- 공고 승인, 반려, 마감과 지원자 매칭은 `backend-2` 중개센터 기능의 책임이며 이 API에 포함되지 않는다.
+- 공고 승인, 반려, 마감과 지원자 매칭은 현재 통합된 `CENTER_ADMIN` 중개센터 API가 처리하며 이 미리보기 API에는 포함되지 않는다.
 - 요청 내용에 민감한 개인정보를 입력하지 말아야 한다.

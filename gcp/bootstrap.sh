@@ -129,7 +129,8 @@ for secret in \
   cityfarmerplus-db-username \
   cityfarmerplus-db-password \
   cityfarmerplus-jwt-secret \
-  cityfarmerplus-kamis-api-key; do
+  cityfarmerplus-kamis-api-key \
+  cityfarmerplus-kamis-cert-id; do
   gcloud secrets describe "${secret}" --project="${PROJECT_ID}" >/dev/null 2>&1 || \
   gcloud secrets create "${secret}" \
     --replication-policy=automatic \

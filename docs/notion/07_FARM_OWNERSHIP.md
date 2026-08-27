@@ -1,11 +1,12 @@
 # CityFarmerPlus 농가 소유 증빙 제출 API
 
-- 기준일: 2026-08-20
-- 기준 소스: 현재 `backend-1` 작업 폴더의 FarmOwnership Controller, DTO, Service, Entity, Repository, 파일 Validator
+- 기준일: 2026-08-27
+- 기준 소스: 통합 코드의 FarmOwnership 사용자·관리자 Controller, DTO, Service, Entity, Repository, 파일 Validator
 - 로컬 Base URL: `http://localhost:8080`
+- 운영 Base URL: `https://cityfarmerplus-api-82951616760.us-west1.run.app`
 - 구현 API: 4개
 
-> 이 문서는 다른 문서를 보지 않아도 노션에 단독으로 복사할 수 있는 농가 소유 증빙 명세다. 현재 backend-1은 농가 본인의 제출·재제출·이력 조회·상세 조회·본인 파일 다운로드만 제공한다. 담당자의 승인·반려 및 담당자용 파일 다운로드 API는 backend-2 범위다.
+> 이 문서는 농가 사용자용 소유 증빙 API를 노션에 단독으로 복사할 수 있게 정리한다. 중개센터의 심사 목록·상세·파일 다운로드·승인·반려 API도 통합돼 있으며 상세 계약은 `ADMIN_FARM_OWNERSHIP_API_SPEC.md`를 따른다.
 
 ---
 
@@ -20,7 +21,7 @@
 - 제출 시점의 농가 핵심 정보를 스냅샷으로 보존한다.
 - 제출 회차와 첨부 문서는 수정·삭제·덮어쓰기 하지 않는다.
 - 담당자가 반려한 뒤 재제출하면 `attemptNumber`가 증가하고 과거 제출·파일 이력이 유지된다.
-- 담당자의 승인·반려 HTTP API는 backend-1에 없다.
+- 담당자는 통합된 중개센터 API로 최신 심사 대기 회차를 승인·반려한다.
 
 ---
 
@@ -252,8 +253,8 @@ Content-Type: application/json
 
 ```text
 DRAFT ── 최초 제출(attempt 1) ──> PENDING_REVIEW
-PENDING_REVIEW ── backend-2 승인 ──> APPROVED
-PENDING_REVIEW ── backend-2 반려 ──> REJECTED
+PENDING_REVIEW ── CENTER_ADMIN 승인 ──> APPROVED
+PENDING_REVIEW ── CENTER_ADMIN 반려 ──> REJECTED
 REJECTED ── 재제출(attempt N+1) ──> PENDING_REVIEW
 ```
 
@@ -371,7 +372,7 @@ Content-Disposition: attachment; filename*=UTF-8''...
 - 파일 저장 중 일부 실패 또는 DB 트랜잭션 실패 시 이번 요청 파일을 보상 삭제한다.
 - 회원이 활성 상태인 동안 별도의 기간 만료 삭제 규칙은 없다.
 - 회원 탈퇴가 완료되면 실제 저장 파일을 삭제 작업에 등록한다. 제출·문서 DB 메타데이터를 이 API에서 물리 삭제하지는 않는다.
-- 회원 탈퇴 시 농가 프로필이 `INACTIVE`로 바뀌므로 backend-2의 `PENDING_REVIEW` 프로필 목록에서 제외된다. 소유자 계정도 비활성화되어 물리 파일 삭제가 재시도 중인 동안에도 이 다운로드 API를 사용할 수 없다.
+- 회원 탈퇴 시 농가 프로필이 `INACTIVE`로 바뀌므로 `CENTER_ADMIN`의 `PENDING_REVIEW` 프로필 목록에서 제외된다. 소유자 계정도 비활성화되어 물리 파일 삭제가 재시도 중인 동안에도 이 다운로드 API를 사용할 수 없다.
 
 ---
 
@@ -426,13 +427,13 @@ Content-Disposition: attachment; filename*=UTF-8''...
 | 500 | `OWNERSHIP_DOCUMENT_STORAGE_ERROR` | 저장 실패 또는 검증한 파일과 저장 결과 불일치 |
 | 500 | `OWNERSHIP_DOCUMENT_READ_ERROR` | 문서 메타데이터는 있으나 저장 파일이 유실되었거나 읽기 실패 |
 
-`OWNERSHIP_REVIEW_NOT_ALLOWED`, `OWNERSHIP_REJECTION_REASON_REQUIRED` 코드도 도메인에는 준비돼 있지만 backend-1에 이를 반환하는 담당자 HTTP API는 없다.
+`OWNERSHIP_REVIEW_NOT_ALLOWED`, `OWNERSHIP_REJECTION_REASON_REQUIRED`는 통합된 담당자 승인·반려 API에서 반환할 수 있다.
 
 ---
 
-## 12. backend-2 담당자 기능과의 경계
+## 12. 중개센터 담당자 기능 연동
 
-현재 backend-1에는 다음 HTTP API가 없다.
+현재 통합 코드에는 다음 HTTP API가 구현돼 있다.
 
 - 심사 대기 농가·제출 목록 API
 - 담당자용 제출 상세 API
@@ -440,7 +441,7 @@ Content-Disposition: attachment; filename*=UTF-8''...
 - 농가 소유 승인 API
 - 농가 소유 반려 API
 
-다만 병합을 위해 다음 계약은 이미 존재한다.
+사용자와 담당자 API는 다음 계약을 공유한다.
 
 - 담당자 역할 `CENTER_ADMIN`
 - 제출 상태 `PENDING_REVIEW`, `APPROVED`, `REJECTED`
@@ -448,14 +449,14 @@ Content-Disposition: attachment; filename*=UTF-8''...
 - `reviewerId`, `reviewerName`, `reviewedAt`, `rejectionReason`
 - 최신 심사 대기 회차만 담당자가 처리하는 Entity·Repository 구조
 
-backend-2의 한 심사 작업은 최신 제출 회차의 상태와 농가 프로필 상태를 함께 변경해야 한다.
+담당자의 한 심사 작업은 최신 제출 회차의 상태와 농가 프로필 상태를 함께 변경한다.
 
 - 승인: 제출 `APPROVED`, 프로필 `APPROVED`, 반려 사유 제거
 - 반려: 제출 `REJECTED`, 프로필 `REJECTED`, 반려 사유 저장
 
 심사 대기 목록은 제출 상태만으로 조회하지 않고 농가 프로필 상태가 `PENDING_REVIEW`인 건만 대상으로 해야 한다. 탈퇴 처리로 프로필이 `INACTIVE`가 된 제출의 과거 상태와 심사자 이력은 감사 이력으로 보존하되 신규 심사에서는 제외한다.
 
-따라서 backend-1만 실행하면 `PENDING_REVIEW`까지 만들 수 있지만 정상 HTTP 흐름만으로 승인·반려하거나 재제출 조건인 `REJECTED`를 만들 수 없다.
+농가가 `PENDING_REVIEW` 제출을 만들고, `CENTER_ADMIN`이 승인·반려한다. 반려 후 농가는 같은 사용자 API로 새 회차를 제출할 수 있다.
 
 ---
 
@@ -471,4 +472,4 @@ backend-2의 한 심사 작업은 최신 제출 회차의 상태와 농가 프�
 8. 확장자만 바꾼 위장 파일로 `400 INVALID_OWNERSHIP_DOCUMENT_CONTENT`를 확인한다.
 9. 허용하지 않는 확장자로 `415 UNSUPPORTED_OWNERSHIP_DOCUMENT_TYPE`을 확인한다.
 10. 다른 농가 토큰으로 문서 다운로드를 시도해 `403 OWNERSHIP_DOCUMENT_ACCESS_DENIED`를 확인한다.
-11. backend-2 심사 기능 병합 후 반려하고 재제출 회차가 2로 증가하며 1회차가 유지되는지 확인한다.
+11. 중개센터 심사 API로 반려하고 재제출 회차가 2로 증가하며 1회차가 유지되는지 확인한다.

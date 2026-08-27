@@ -34,11 +34,26 @@ steps:
     args:
       - -ceu
       - |
+        set -Eeuo pipefail
         if [ "${_DEPLOY}" != "true" ]; then
           echo "Bootstrap build complete; Cloud Run update skipped."
           exit 0
         fi
-        gcloud run services update "${_SERVICE}" \
+        current_traffic_revision() {
+          gcloud run services describe "${_SERVICE}" \
+            --project="$PROJECT_ID" \
+            --region="${_REGION}" \
+            --flatten='status.traffic[]' \
+            --filter='status.traffic.percent=100' \
+            --format='value(status.traffic.revisionName)'
+        }
+        PREVIOUS_REVISION="$$(current_traffic_revision)"
+        if [ -z "$$PREVIOUS_REVISION" ]; then
+          echo "Current 100% production revision could not be resolved." >&2
+          exit 1
+        fi
+        CANDIDATE_TAG="candidate-$BUILD_ID"
+        gcloud run deploy "${_SERVICE}" \
           --project="$PROJECT_ID" \
           --region="${_REGION}" \
           --platform=managed \
@@ -50,10 +65,150 @@ steps:
           --max=1 \
           --timeout=300 \
           --cpu-throttling \
+          --no-traffic \
+          --tag="$$CANDIDATE_TAG" \
           --startup-probe="httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=0,failureThreshold=24,timeoutSeconds=2,periodSeconds=10" \
           --liveness-probe="httpGet.path=/health/live,httpGet.port=8080,initialDelaySeconds=0,failureThreshold=3,timeoutSeconds=2,periodSeconds=30" \
           --update-env-vars="^@^CORS_ALLOWED_ORIGINS=${_CORS_ALLOWED_ORIGINS}" \
           --quiet
+        CANDIDATE_REVISION=""
+        if ! CANDIDATE_REVISION="$$(gcloud run services describe "${_SERVICE}" \
+          --project="$PROJECT_ID" \
+          --region="${_REGION}" \
+          --flatten='status.traffic[]' \
+          --filter="status.traffic.tag=$$CANDIDATE_TAG" \
+          --format='value(status.traffic.revisionName)')"; then
+          CANDIDATE_REVISION=""
+        fi
+        CANDIDATE_URL=""
+        if ! CANDIDATE_URL="$$(gcloud run services describe "${_SERVICE}" \
+          --project="$PROJECT_ID" \
+          --region="${_REGION}" \
+          --flatten='status.traffic[]' \
+          --filter="status.traffic.tag=$$CANDIDATE_TAG" \
+          --format='value(status.traffic.url)')"; then
+          CANDIDATE_URL=""
+        fi
+        if [ -z "$$CANDIDATE_REVISION" ] || [ -z "$$CANDIDATE_URL" ]; then
+          echo "Candidate revision or tagged URL could not be resolved; production traffic was not changed." >&2
+          gcloud run services update-traffic "${_SERVICE}" \
+            --project="$PROJECT_ID" \
+            --region="${_REGION}" \
+            --remove-tags="$$CANDIDATE_TAG" \
+            --quiet || true
+          exit 1
+        fi
+        if ! bash gcp/smoke-public.sh "$$CANDIDATE_URL"; then
+          gcloud run services update-traffic "${_SERVICE}" \
+            --project="$PROJECT_ID" \
+            --region="${_REGION}" \
+            --remove-tags="$$CANDIDATE_TAG" \
+            --quiet || true
+          exit 1
+        fi
+        REMOTE_MAIN_SHA="$$(curl --fail --show-error --silent \
+          https://api.github.com/repos/ParkChanWoo0321/CityFarmerPlus_BE/git/ref/heads/main \
+          | sed -n 's/.*"sha"[[:space:]]*:[[:space:]]*"\([0-9a-f]\{40\}\)".*/\1/p' \
+          | head -n 1)"
+        if [ -z "$$REMOTE_MAIN_SHA" ] || [ "$$REMOTE_MAIN_SHA" != "$COMMIT_SHA" ]; then
+          echo "GitHub main advanced while this build was running; production traffic was not changed." >&2
+          gcloud run services update-traffic "${_SERVICE}" \
+            --project="$PROJECT_ID" \
+            --region="${_REGION}" \
+            --remove-tags="$$CANDIDATE_TAG" \
+            --quiet || true
+          exit 1
+        fi
+        SERVICE_URL="$$(gcloud run services describe "${_SERVICE}" \
+          --project="$PROJECT_ID" \
+          --region="${_REGION}" \
+          --format='value(status.url)')"
+        TRAFFIC_SWITCHED=false
+        rollback_and_exit() {
+          exit_code="$$1"
+          rollback_succeeded=false
+          rollback_owner_changed=false
+          trap - ERR INT TERM
+          set +e
+          if [ "$${TRAFFIC_SWITCHED:-false}" = "true" ]; then
+            current_revision="$$(current_traffic_revision)"
+            if [ "$$current_revision" = "$$CANDIDATE_REVISION" ]; then
+              echo "Deployment failed after traffic change; rolling back to $$PREVIOUS_REVISION." >&2
+              for attempt in 1 2 3; do
+                current_revision="$$(current_traffic_revision)"
+                if [ "$$current_revision" != "$$CANDIDATE_REVISION" ]; then
+                  if [ "$$current_revision" = "$$PREVIOUS_REVISION" ]; then
+                    rollback_succeeded=true
+                  elif [ -n "$$current_revision" ]; then
+                    echo "Rollback stopped because traffic is now owned by $$current_revision." >&2
+                    rollback_owner_changed=true
+                  else
+                    echo "CRITICAL: current production revision could not be resolved during rollback." >&2
+                  fi
+                  break
+                fi
+                gcloud run services update-traffic "${_SERVICE}" \
+                  --project="$PROJECT_ID" \
+                  --region="${_REGION}" \
+                  --to-revisions="$$PREVIOUS_REVISION=100" \
+                  --quiet
+                if [ "$$(current_traffic_revision)" = "$$PREVIOUS_REVISION" ]; then
+                  rollback_succeeded=true
+                  break
+                fi
+                if [ "$$attempt" -lt 3 ]; then
+                  sleep 5
+                fi
+              done
+              if [ "$$rollback_succeeded" = "true" ]; then
+                bash gcp/smoke-health.sh "$$SERVICE_URL" || \
+                  echo "Rollback revision was restored, but rollback health verification failed." >&2
+              elif [ "$$rollback_owner_changed" != "true" ]; then
+                echo "CRITICAL: traffic rollback to $$PREVIOUS_REVISION failed." >&2
+              fi
+            elif [ -n "$$current_revision" ]; then
+              echo "Traffic is now owned by $$current_revision; this failed deployment did not overwrite it." >&2
+            else
+              echo "CRITICAL: current production revision could not be resolved; rollback was not attempted." >&2
+            fi
+          fi
+          gcloud run services update-traffic "${_SERVICE}" \
+            --project="$PROJECT_ID" \
+            --region="${_REGION}" \
+            --remove-tags="$$CANDIDATE_TAG" \
+            --quiet || true
+          exit "$$exit_code"
+        }
+        CURRENT_REVISION=""
+        if ! CURRENT_REVISION="$$(current_traffic_revision)"; then
+          CURRENT_REVISION=""
+        fi
+        if [ "$$CURRENT_REVISION" != "$$PREVIOUS_REVISION" ]; then
+          echo "Production traffic changed from $$PREVIOUS_REVISION to $$CURRENT_REVISION; this candidate was not promoted." >&2
+          gcloud run services update-traffic "${_SERVICE}" \
+            --project="$PROJECT_ID" \
+            --region="${_REGION}" \
+            --remove-tags="$$CANDIDATE_TAG" \
+            --quiet || true
+          exit 1
+        fi
+        trap 'rollback_and_exit $$?' ERR
+        trap 'rollback_and_exit 130' INT
+        trap 'rollback_and_exit 143' TERM
+        TRAFFIC_SWITCHED=true
+        gcloud run services update-traffic "${_SERVICE}" \
+          --project="$PROJECT_ID" \
+          --region="${_REGION}" \
+          --to-revisions="$$CANDIDATE_REVISION=100" \
+          --quiet
+        bash gcp/smoke-public.sh "$$SERVICE_URL"
+        TRAFFIC_SWITCHED=false
+        trap - ERR INT TERM
+        gcloud run services update-traffic "${_SERVICE}" \
+          --project="$PROJECT_ID" \
+          --region="${_REGION}" \
+          --remove-tags="$$CANDIDATE_TAG" \
+          --quiet || echo "Candidate tag $$CANDIDATE_TAG could not be removed." >&2
 
 substitutions:
   _REGION: us-west1

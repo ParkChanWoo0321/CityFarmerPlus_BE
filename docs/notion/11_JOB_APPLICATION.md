@@ -1,15 +1,16 @@
 # 공고 지원·농가 지원자 의견 API
 
 - 기준일: 2026-08-20
-- 기준: 현재 `backend-1` 코드
+- 기준: 현재 `main` 통합 코드
 - 로컬 Base URL: `http://localhost:8080`
+- 운영 Base URL: `https://cityfarmerplus-api-82951616760.us-west1.run.app`
 - API 수: 6개
 
 ## 기능 경계
 
 - 도시농부: 모집 중 공고 지원, 내 지원 조회, 매칭 전 지원 취소
 - 농가: 자기 공고의 지원자 조회, 선호/비선호 의견 기록
-- **농가 의견은 수락/거절이 아니다. 최종 매칭은 `backend-2` 중개센터가 확정한다.**
+- **농가 의견은 수락/거절이 아니다. 최종 매칭은 `CENTER_ADMIN` 중개센터가 확정한다.**
 - 중개센터/관리자 전용 API는 이 문서에 포함하지 않는다.
 
 ## 공통 인증
@@ -36,7 +37,7 @@
 |---|---|
 | `APPLIED` | 지원 완료, 매칭 대기 |
 | `WITHDRAWN` | 도시농부가 지원 취소 |
-| `MATCHED` | `backend-2` 중개센터가 매칭 확정 |
+| `MATCHED` | `CENTER_ADMIN` 중개센터가 매칭 확정 |
 | `NOT_MATCHED` | 매칭 미선정 |
 | `POSTING_CANCELLED` | 공고 취소로 지원도 취소 |
 | `NO_SHOW` | 결근 처리 |
@@ -317,27 +318,27 @@
 
 ```bash
 # 도시농부 지원
-curl -X POST "http://localhost:8080/api/job-postings/101/applications" \
+curl -X POST "{{baseUrl}}/api/job-postings/101/applications" \
   -H "Authorization: Bearer {{urbanFarmerAccessToken}}"
 
 # 내 지원 목록
-curl "http://localhost:8080/api/urban-farmers/me/job-applications?page=0&size=20" \
+curl "{{baseUrl}}/api/urban-farmers/me/job-applications?page=0&size=20" \
   -H "Authorization: Bearer {{urbanFarmerAccessToken}}"
 
 # 농가 지원자 목록
-curl "http://localhost:8080/api/farm/job-postings/101/applications" \
+curl "{{baseUrl}}/api/farm/job-postings/101/applications" \
   -H "Authorization: Bearer {{farmAccessToken}}"
 
 # 농가 의견 수정
-curl -X PATCH "http://localhost:8080/api/farm/job-postings/101/applications/501/opinion" \
+curl -X PATCH "{{baseUrl}}/api/farm/job-postings/101/applications/501/opinion" \
   -H "Authorization: Bearer {{farmAccessToken}}" \
   -H "Content-Type: application/json" \
   -d '{"opinion":"PREFERRED","note":"수확 경험을 선호합니다."}'
 ```
 
-## 현재 제한과 `backend-2` 책임
+## 현재 제한과 중개센터 역할
 
 - 같은 날짜·시간대의 여러 공고에 지원하는 것은 현재 허용된다. 지원 단계에서 일정 중복을 검사하지 않는다.
-- 최종 매칭 시 인원 제한, 일정 중복 검사, 미선정 처리, 근무 일정 생성은 `backend-2`가 담당한다.
+- 최종 매칭 시 인원 제한, 일정 중복 검사, 미선정 처리와 근무 일정 생성은 현재 통합된 `CENTER_ADMIN` API가 처리한다.
 - 농가 의견 `PREFERRED`/`NOT_PREFERRED`는 중개센터의 매칭 판단을 돕는 정보일 뿐, 자동 매칭이 아니다.
-- 매칭 확정/취소 전용 프론트 API는 `backend-1`에 없다.
+- 매칭 확정은 `POST /api/admin/job-postings/{postingId}/matches`로 구현돼 있다. 확정된 매칭을 취소하거나 되돌리는 API는 현재 없다.

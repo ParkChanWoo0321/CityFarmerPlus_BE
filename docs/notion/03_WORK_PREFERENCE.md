@@ -1,8 +1,9 @@
 # CityFarmerPlus 희망 근무 조건 API 명세서
 
 - 기준일: 2026-08-20
-- 기준 소스: 현재 `backend-1` 작업 폴더의 `WorkPreferenceController`, DTO, Service, Entity 및 공통 인증·예외 코드
+- 기준 소스: 현재 `main` 통합 코드의 `WorkPreferenceController`, DTO, Service, Entity 및 공통 인증·예외 코드
 - 로컬 Base URL: `http://localhost:8080`
+- 운영 Base URL: `https://cityfarmerplus-api-82951616760.us-west1.run.app`
 - API 수: 3개
 
 > 이 3개 API는 희망 근무 조건만 독립적으로 관리한다. 디자인의 사업참여 신청 한 화면에서는 [04A_PARTICIPATION_FORM.md](04A_PARTICIPATION_FORM.md)의 통합 API를 사용할 수 있으며, 통합 API 추가 후에도 이 API들은 유지된다.

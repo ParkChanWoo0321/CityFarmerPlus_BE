@@ -2,16 +2,17 @@
 
 - 문서 버전: 2.0
 - 갱신일: 2026-08-26
-- 구현 기준 브랜치: `backend-1`
+- 구현 기준: 현재 `main` 통합 코드
 - 적용 범위: 회원가입, 아이디 확인, 로그인, 내 정보 조회·수정, 회원 탈퇴, 로그아웃
 - 관련 문서: [FULL_API_SPEC.md](FULL_API_SPEC.md), [API_SPEC_INDEX.md](API_SPEC_INDEX.md)
 
 ## 1. 공통 사항
 
-로컬 기본 URL:
+기본 URL:
 
 ```text
-http://localhost:8080
+운영: https://cityfarmerplus-api-82951616760.us-west1.run.app
+로컬: http://localhost:8080
 ```
 
 보호 API의 인증 헤더:
@@ -35,7 +36,7 @@ Authorization: Bearer {{accessToken}}
 |---|---|---|
 | `URBAN_FARMER` | 도시농부 | 가능 |
 | `FARM` | 농가 | 가능 |
-| `CENTER_ADMIN` | backend-2 담당자 공통 역할 | 불가능 |
+| `CENTER_ADMIN` | 중개센터 담당자 | 불가능 |
 
 한 계정은 하나의 역할만 가진다. 본인인증은 하지 않으므로 같은 사람이 서로 다른 아이디로 두 일반 역할 계정을 각각 만드는 것은 차단하지 못한다.
 
@@ -45,7 +46,7 @@ Authorization: Bearer {{accessToken}}
 | `SUSPENDED` | 정지 |
 | `WITHDRAWN` | 탈퇴 |
 
-신규 회원은 `ACTIVE`로 생성된다. `CENTER_ADMIN` enum과 JWT 역할 변환은 backend-2 병합용 공통 계약이지만, backend-1에는 담당자 계정 발급 또는 담당자 업무 처리 API가 없다.
+신규 회원은 `ACTIVE`로 생성된다. `CENTER_ADMIN` 계정은 공개 회원가입으로 만들지 않으며, provisioning key가 설정된 동안에만 `POST /api/internal/center-admins`로 발급한다. 담당자 업무는 `CENTER_ADMIN` JWT가 필요한 `/api/admin/**` API에서 처리한다.
 
 ## 3. API 목록
 
@@ -284,4 +285,4 @@ Authorization: Bearer {{accessToken}}
 - Refresh Token과 비밀번호 재설정
 - 비밀번호 변경
 - 서버 측 강제 로그아웃
-- backend-1의 담당자 계정 발급 및 담당자 업무 처리 API
+- 운영자가 provisioning key를 설정하지 않은 상태에서의 담당자 계정 발급

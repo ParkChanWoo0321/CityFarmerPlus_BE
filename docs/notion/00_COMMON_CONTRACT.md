@@ -1,9 +1,10 @@
 # CityFarmerPlus API 공통 계약
 
-- 기준일: 2026-08-20
-- 기준 소스: 현재 `backend-1` 작업 폴더의 Controller, DTO, Security, Service, Exception 코드
+- 기준일: 2026-08-27
+- 기준 소스: 현재 `main` 통합 코드의 Controller, DTO, Security, Service, Exception
 - 로컬 Base URL: `http://localhost:8080`
-- 구현 HTTP API: 66개 (`OPTIONS` preflight 제외)
+- 운영 Base URL: `https://cityfarmerplus-api-82951616760.us-west1.run.app`
+- 사용자 HTTP API: 67개 (`OPTIONS`와 관리자·health 제외)
 - 업무 시간대: 공고·지원·근무·대시보드에서 현재 시각을 비교할 때 `Asia/Seoul`을 사용한다. 전역 서버/Jackson 시간대 설정을 의미하지 않는다.
 
 > 이 문서는 노션에 단독으로 복사할 수 있는 공통 계약 문서다. 기능별 요청·응답은 같은 폴더의 개별 문서를 참고한다.
@@ -50,9 +51,13 @@ JWT 자체가 유효하더라도 DB의 현재 계정이 `ACTIVE`가 아니거나
 | `GET` | `/api/job-postings` |
 | `GET` | `/api/job-postings/{postingId}` |
 | `GET` | `/api/support/faqs` |
+| `GET` | `/api/market-prices/latest` |
 | `GET` | `/health` |
+| `GET` | `/health/live` |
+| `POST` | `/api/internal/center-admins` (provisioning key가 설정된 동안만) |
 | `OPTIONS` | `/api/**` |
 | `OPTIONS` | `/health` |
+| `OPTIONS` | `/health/**` |
 
 그 외 API는 현재 Security 설정상 Bearer JWT가 필요하다. 공개 공고 조회에 JWT는 선택 사항이며, 유효한 JWT를 보내면 현재 사용자의 지원 정보로 응답이 개인화된다. 공개 API에 잘못된 Bearer JWT를 보내면 401을 반환한다.
 
@@ -64,12 +69,12 @@ JWT 자체가 유효하더라도 DB의 현재 계정이 `ACTIVE`가 아니거나
 |---|---|---|
 | `URBAN_FARMER` | 도시농부 | 가능 |
 | `FARM` | 농가 | 가능 |
-| `CENTER_ADMIN` | backend-2 중개센터 담당자와 공유할 역할 계약 | 불가능 |
+| `CENTER_ADMIN` | 중개센터 담당자 | 불가능 |
 
 - 한 계정은 하나의 역할만 가진다.
 - 공개 회원가입에서 `CENTER_ADMIN`을 전달하면 거절한다.
-- backend-1에는 중개센터 계정 발급 API와 `/api/admin/**` 업무 API가 없다.
-- 승인·반려 결과를 저장하기 위한 심사자, 심사 시각, 반려 사유, 승인 상태는 backend-2와 병합할 공통 도메인 계약으로 유지한다.
+- 중개센터 계정은 운영 기본 비활성인 내부 발급 API로만 만들 수 있다.
+- `/api/admin/**` 42개가 사업참여·교육·농가·공고 심사, 최종 매칭, 근무 정정, 대리 접수와 대시보드를 처리한다.
 
 ---
 
@@ -268,7 +273,7 @@ Content-Disposition
 
 | 변수 | 예시 |
 |---|---|
-| `baseUrl` | `http://localhost:8080` |
+| `baseUrl` | 운영 `https://cityfarmerplus-api-82951616760.us-west1.run.app` 또는 로컬 `http://localhost:8080` |
 | `accessToken` | 로그인 응답의 `accessToken` |
 | `urbanFarmerAccessToken` | 도시농부 JWT |
 | `farmAccessToken` | 농가 JWT |
