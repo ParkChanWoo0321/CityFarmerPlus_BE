@@ -1,9 +1,9 @@
 # CityFarmerPlus 관리자 농가 소유 증빙 심사 API 명세서
 
-- 문서 버전: 1.0
-- 작성일: 2026-08-24
+- 문서 버전: 1.1
+- 갱신일: 2026-08-28
 - 구현 기준: 현재 `main` 통합 코드
-- 적용 범위: 농가 프로필 목록 조회(상태 필터), 상세(최신 소유 증빙 제출) 조회, 소유 증빙 승인, 반려
+- 적용 범위: 농가 프로필 전체·상태별 목록 조회, 상세(최신 소유 증빙 제출) 조회, 소유 증빙 승인, 반려
 
 ## 1. 공통 사항
 
@@ -47,7 +47,7 @@ Authorization: Bearer {{adminAccessToken}}
 
 | 기능 | Method | URL | 인증 | 성공 상태 |
 |---|---|---|---|---|
-| 농가 프로필 목록 조회(상태 필터) | `GET` | `/api/admin/farm-profiles?status=` | Bearer JWT (`ROLE_CENTER_ADMIN`) | `200 OK` |
+| 농가 프로필 전체·상태별 목록 조회 | `GET` | `/api/admin/farm-profiles` | Bearer JWT (`ROLE_CENTER_ADMIN`) | `200 OK` |
 | 농가 소유 증빙 상세 조회 | `GET` | `/api/admin/farm-profiles/{profileId}` | Bearer JWT (`ROLE_CENTER_ADMIN`) | `200 OK` |
 | 농가 소유 증빙 파일 다운로드 | `GET` | `/api/admin/farm-profiles/{profileId}/ownership/documents/{documentId}` | Bearer JWT (`ROLE_CENTER_ADMIN`) | `200 OK` |
 | 농가 소유 증빙 승인 | `POST` | `/api/admin/farm-profiles/{profileId}/ownership/approve` | Bearer JWT (`ROLE_CENTER_ADMIN`) | `200 OK` |
@@ -55,9 +55,16 @@ Authorization: Bearer {{adminAccessToken}}
 
 ## 3. 농가 프로필 목록 조회
 
-**`status` 쿼리 파라미터가 필수다.** 예를 들어 심사 대기 목록은 `status=PENDING_REVIEW`로 조회한다.
+`status` 쿼리 파라미터는 선택이다. 생략하면 `DRAFT`, `PENDING_REVIEW`, `APPROVED`, `REJECTED`, `INACTIVE` 상태의 농가 프로필을 모두 반환하고, 값을 보내면 해당 상태만 반환한다.
 
 ### 3.1 요청
+
+```http
+GET /api/admin/farm-profiles
+Authorization: Bearer {{adminAccessToken}}
+```
+
+상태별 조회 예시:
 
 ```http
 GET /api/admin/farm-profiles?status=PENDING_REVIEW
@@ -66,9 +73,19 @@ Authorization: Bearer {{adminAccessToken}}
 
 | 쿼리 파라미터 | 타입 | 필수 | 값 |
 |---|---|---|---|
-| `status` | Enum | **O** | `DRAFT` / `PENDING_REVIEW` / `APPROVED` / `REJECTED` / `INACTIVE` |
+| `status` | Enum | X | `DRAFT` / `PENDING_REVIEW` / `APPROVED` / `REJECTED` / `INACTIVE`; 생략하면 전체 상태 |
 
-페이지네이션은 지원하지 않는다(`updatedAt` 내림차순 전체 목록).
+페이지네이션은 지원하지 않는다. 필터 적용 여부와 관계없이 `updatedAt` 내림차순으로 반환한다.
+
+상태 의미:
+
+| 상태 | 의미 |
+|---|---|
+| `DRAFT` | 농가 기본 프로필만 작성하고 소유 증빙은 아직 제출하지 않은 상태 |
+| `PENDING_REVIEW` | 농가가 소유 증빙을 제출하고 중개센터 심사를 기다리는 상태 |
+| `APPROVED` | 중개센터가 소유 증빙을 승인하여 승인 농가 기능을 사용할 수 있는 상태 |
+| `REJECTED` | 소유 증빙이 반려되어 반려 사유 확인 후 재제출해야 하는 상태 |
+| `INACTIVE` | 탈퇴 등으로 농가 프로필이 비활성화되어 정상 농가 기능을 사용할 수 없는 상태 |
 
 ### 3.2 성공 응답
 
@@ -76,7 +93,7 @@ Authorization: Bearer {{adminAccessToken}}
 HTTP/1.1 200 OK
 ```
 
-`FarmProfileResponse` 배열을 반환한다.
+`FarmProfileResponse` 배열을 반환한다. `status`를 생략하면 서로 다른 상태의 항목이 한 배열에 함께 포함될 수 있다.
 
 ```json
 [
@@ -112,7 +129,7 @@ HTTP/1.1 200 OK
 | `401` | `UNAUTHORIZED` | JWT 누락, 만료 또는 위조 |
 | `403` | `ACCESS_DENIED` | `CENTER_ADMIN`이 아닌 계정의 JWT로 접근 |
 
-`status` 쿼리 파라미터 자체가 누락된 경우에는 Spring 기본 `400` 응답이 반환되며, 이때는 공통 오류 JSON 형식(`{ code, message }`)이 보장되지 않는다.
+`status`를 생략하는 것은 정상 요청이다. `?status=`처럼 빈 값을 보내거나 정의되지 않은 값을 보내면 `400`이 발생할 수 있으므로 전체 조회는 쿼리 파라미터 자체를 제거해 호출한다.
 
 ## 4. 농가 소유 증빙 상세 조회
 
@@ -341,7 +358,8 @@ HTTP/1.1 200 OK
 이 기능은 새 테이블·컬럼을 추가하지 않는다. 순수 추가된 조회 메서드는 다음과 같다(전체 컬럼 정의는 각 엔티티 참고).
 
 - `FarmProfileRepository.findByIdForUpdate(Long id)`: `profileId` 기준 비관적 락 조회(`PESSIMISTIC_WRITE`). 기존 `findByOwnerIdForUpdate`(농가 본인용, `ownerId` 기준)와 별개로, 관리자가 `profileId`로 직접 접근하는 용도로 추가했다. `owner_user_id`는 `updatable = false` + 유니크 제약으로 프로필 생성 후 절대 바뀌지 않는 값이라, 두 락 메서드가 서로 다른 키로 같은 행을 잠가도 안전하다.
-- `FarmProfileRepository.findAllByStatusOrderByUpdatedAtDesc(FarmProfileStatus status)`: 3장 목록 조회용 파생 쿼리.
+- `FarmProfileRepository.findAllByOrderByUpdatedAtDesc()`: `status`를 생략한 전체 목록 조회용 파생 쿼리.
+- `FarmProfileRepository.findAllByStatusOrderByUpdatedAtDesc(FarmProfileStatus status)`: 상태별 목록 조회용 파생 쿼리.
 
 ## 10. 농가 소유 증빙 파일 다운로드
 

@@ -39,7 +39,7 @@ public class AdminFarmOwnershipController {
 
     @GetMapping
     public ResponseEntity<List<FarmProfileResponse>> list(
-            @RequestParam FarmProfile.FarmProfileStatus status
+            @RequestParam(required = false) FarmProfile.FarmProfileStatus status
     ) {
         return ResponseEntity.ok(farmOwnershipService.list(status));
     }

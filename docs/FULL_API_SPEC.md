@@ -809,13 +809,13 @@ id, question, category, answer, officialConfirmationRequired, createdAt
 
 | 기능 | Method | URL | 권한 | 요청 | 성공 |
 |---|---|---|---|---|---|
-| 상태별 농가 목록 | GET | /api/admin/farm-profiles | CENTER_ADMIN | 필수 `status` | 200 `List<FarmProfileResponse>` |
+| 전체·상태별 농가 목록 | GET | /api/admin/farm-profiles | CENTER_ADMIN | 선택 `status`; 생략 시 전체 | 200 `List<FarmProfileResponse>` |
 | 최신 소유 제출 상세 | GET | /api/admin/farm-profiles/{profileId} | CENTER_ADMIN | 없음 | 200 `FarmOwnershipSubmissionResponse` |
 | 소유 증빙 다운로드 | GET | /api/admin/farm-profiles/{profileId}/ownership/documents/{documentId} | CENTER_ADMIN | 없음 | 200 binary |
 | 소유 증빙 승인 | POST | /api/admin/farm-profiles/{profileId}/ownership/approve | CENTER_ADMIN | 없음 | 200 `FarmOwnershipSubmissionResponse` |
 | 소유 증빙 반려 | POST | /api/admin/farm-profiles/{profileId}/ownership/reject | CENTER_ADMIN | `FarmOwnershipRejectRequest` | 200 `FarmOwnershipSubmissionResponse` |
 
-`status`는 `DRAFT`, `PENDING_REVIEW`, `APPROVED`, `REJECTED`, `INACTIVE` 중 하나다. 최신 제출과 프로필이 모두 심사 대기인 경우에만 승인·반려하며 두 상태와 심사자·심사 시각을 같은 트랜잭션으로 갱신한다. 반려 `reason`은 공백 불가, 최대 1000자다.
+`status`는 선택이며 `DRAFT`, `PENDING_REVIEW`, `APPROVED`, `REJECTED`, `INACTIVE` 중 하나다. 생략하면 모든 상태를 `updatedAt` 내림차순으로 반환하고 값을 보내면 해당 상태만 반환한다. 최신 제출과 프로필이 모두 심사 대기인 경우에만 승인·반려하며 두 상태와 심사자·심사 시각을 같은 트랜잭션으로 갱신한다. 반려 `reason`은 공백 불가, 최대 1000자다.
 
 #### 13.2.5 공고 심사·수정·매칭 — 9개
 
