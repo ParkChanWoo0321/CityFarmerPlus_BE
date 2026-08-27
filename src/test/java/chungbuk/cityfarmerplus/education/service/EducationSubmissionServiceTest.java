@@ -14,6 +14,7 @@ import chungbuk.cityfarmerplus.education.repository.EducationCourseRepository;
 import chungbuk.cityfarmerplus.urbanfarmer.service.UserRoleAccessService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
@@ -31,6 +32,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -71,7 +73,7 @@ class EducationSubmissionServiceTest {
     private EducationProgressService progressService;
 
     @Test
-    void successfulSubmissionKeepsFilesWithoutSchedulingCompensation() {
+    void successfulSubmissionRegistersStoredFilesForRollbackCleanup() {
         MultipartFile source = document("certificate.pdf");
         stubSubmission(List.of(validated(source, "hash-1")));
         when(fileStorage.store(
@@ -83,11 +85,17 @@ class EducationSubmissionServiceTest {
 
         service().submit(USER_ID, request(), List.of(source));
 
-        verify(transactionService).persist(
+        InOrder persistenceThenRollbackRegistration = inOrder(
+                transactionService,
+                fileDeletionScheduler
+        );
+        persistenceThenRollbackRegistration.verify(transactionService).persist(
                 eq(USER_ID),
                 any(EducationSubmissionRequest.class),
                 anyList()
         );
+        persistenceThenRollbackRegistration.verify(fileDeletionScheduler)
+                .deleteOnRollback(List.of("key-1"));
         verify(fileDeletionScheduler, never()).deleteNowWithRetry(anyList(), anyString());
         verify(fileStorage, never()).delete(anyString());
     }

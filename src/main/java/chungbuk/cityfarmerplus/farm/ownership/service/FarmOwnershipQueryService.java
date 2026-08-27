@@ -61,6 +61,22 @@ public class FarmOwnershipQueryService {
                 .orElseThrow(FarmOwnershipException::documentNotFound);
         validateDownloadAuthority(requester, document);
 
+        return loadDocument(document);
+    }
+
+    public FarmOwnershipDocumentDownload downloadForAdmin(
+            Long profileId,
+            Long documentId
+    ) {
+        FarmOwnershipDocument document = documentRepository
+                .findByIdAndSubmissionFarmProfileId(documentId, profileId)
+                .orElseThrow(FarmOwnershipException::documentNotFound);
+        return loadDocument(document);
+    }
+
+    private FarmOwnershipDocumentDownload loadDocument(
+            FarmOwnershipDocument document
+    ) {
         try {
             Resource resource = fileStorage.load(document.getStorageKey());
             if (!resource.exists() || !resource.isReadable()) {

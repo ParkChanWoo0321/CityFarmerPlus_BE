@@ -22,7 +22,8 @@ GitHub main
 - 데이터베이스: 현재 사용 중인 외부 MySQL 재사용
 - 파일: Google Cloud Storage와 Application Default Credentials(ADC)
 - 비밀값: Secret Manager
-- Health Check: `GET /health`
+- Readiness: `GET /health` (애플리케이션과 DB `SELECT 1` 준비 상태 확인)
+- Liveness: `GET /health/live` (프로세스 생존 확인, DB 장애와 분리)
 
 Cloud SQL은 장기 상시 무료가 아니므로 기본안에서 생성하지 않는다. 이후 유료 운영 환경이 필요할 때 별도 마이그레이션으로 전환한다.
 
@@ -36,7 +37,7 @@ GCP 무료 한도를 사용하려면 활성 결제 계정이 필요하다. 결�
 - Cloud Storage bucket은 Always Free 대상인 `us-west1`에 만든다. Standard Storage 무료 한도는 월 5 GiB이며 세 개의 미국 무료 리전 사용량을 합산한다.
 - Cloud Build는 무료 대상인 기본 풀 `e2-standard-2`를 사용한다. 결제 계정당 월 2,500 build-minutes까지 무료다.
 - Artifact Registry에는 전용 repository 정리 정책을 적용해 최근 이미지 한 개만 남긴다. 무료 저장공간은 결제 계정당 0.5 GiB다.
-- Secret Manager는 네 개의 활성 secret version만 유지한다. 무료 한도는 활성 version 6개와 월 10,000회 access다.
+- Secret Manager는 DB/JWT/KAMIS용 다섯 개의 활성 secret version만 유지한다. 무료 한도는 활성 version 6개와 월 10,000회 access다.
 - Cloud SQL, Serverless VPC Access connector, 최소 인스턴스 1 이상은 만들지 않는다.
 - 외부 MySQL 제공자의 무료 한도와 만료 정책은 별도로 확인한다.
 
@@ -56,6 +57,7 @@ Cloud Run은 `PORT`를 주입한다. 애플리케이션은 `0.0.0.0:${PORT}`에 
 | `DB_USERNAME` | Secret Manager | 전용 DB 사용자 |
 | `DB_PASSWORD` | Secret Manager | DB 비밀번호 |
 | `JWT_SECRET` | Secret Manager | 32바이트 이상 난수 |
+| `KAMIS_API_KEY` | Secret Manager | KAMIS Open API 인증 키. 저장과 배포 연결만 담당하며, 실제 시세 호출에는 별도 요청자 ID와 클라이언트 구현이 필요 |
 | `JWT_ISSUER` | Cloud Run env | 고정 issuer. 예: `urn:cityfarmerplus:api` |
 | `CORS_ALLOWED_ORIGINS` | Cloud Run env | 실제 프론트 Origin 목록 |
 | `FILE_STORAGE_TYPE` | Cloud Run env | `gcs` |
@@ -78,6 +80,19 @@ Cloud Run은 `PORT`를 주입한다. 애플리케이션은 `0.0.0.0:${PORT}`에 
 4. `main`에 배포할 변경이 커밋·푸시되어 있어야 한다.
 5. 실제 DB/JWT 값은 채팅, Git, 문서에 붙여 넣지 않고 사용자가 Cloud Shell 또는 GCP Console에 직접 입력한다.
 6. 외부 MySQL을 백업하고 현재 스키마와 애플리케이션 엔티티가 맞는지 확인한다. 운영 DB에는 `ddl-auto=update`를 사용하지 않는다.
+
+backend-2를 처음 배포할 때는 백업 후 `gcp/migrations/20260827_backend2_tables.sql`을 외부 MySQL에 한 번 적용한다. 이 migration은 대리 접수 감사 로그와 출결 정정 이력 테이블을 생성한다. 두 테이블이 조회되는 것을 확인한 뒤에만 `JPA_DDL_AUTO=validate` revision을 배포한다.
+
+Cloud Shell에서는 다음 전용 runner를 사용한다. 이 스크립트는 Secret Manager 값을 출력하지 않고 읽으며, DB read-only preflight → 전체 DB gzip dump → SHA-256 생성 → 비공개 GCS bucket 업로드·존재 확인 → migration 적용 → 신규 컬럼·테이블·인덱스·FK·NULL 검증 순서로 실행한다. 백업이 생성·업로드되지 않으면 migration을 시작하지 않는다.
+
+```bash
+git clone --depth 1 --branch develop \
+  https://github.com/ParkChanWoo0321/CityFarmerPlus_BE.git
+cd CityFarmerPlus_BE
+bash gcp/migrate-backend2.sh
+```
+
+성공 출력의 GCS 백업 URI와 SHA-256을 배포 기록에 보관한다. 과거 교육 제출의 당시 필수 시간은 기존 DB에 별도로 보존되지 않았으므로, `required_hours_snapshot`은 migration 실행 시점의 해당 과정 필수 시간으로 백필된다.
 
 로컬 PC에 `gcloud`가 없다면 무료 Cloud Shell에서 아래 명령을 실행할 수 있다.
 
@@ -205,14 +220,15 @@ done
 
 ## 7. Secret Manager
 
-네 개의 secret을 만든다. 이미 존재하면 그대로 재사용한다.
+다섯 개의 secret을 만든다. 이미 존재하면 그대로 재사용한다.
 
 ```bash
 for SECRET in \
   cityfarmerplus-db-url \
   cityfarmerplus-db-username \
   cityfarmerplus-db-password \
-  cityfarmerplus-jwt-secret
+  cityfarmerplus-jwt-secret \
+  cityfarmerplus-kamis-api-key
 do
   gcloud secrets describe "$SECRET" >/dev/null 2>&1 || \
     gcloud secrets create "$SECRET" --replication-policy=automatic
@@ -245,6 +261,12 @@ JWT_SECRET_VERSION="$(printf %s "$VALUE" | gcloud secrets versions add \
   cityfarmerplus-jwt-secret --data-file=- --format='value(name)')"
 JWT_SECRET_VERSION="${JWT_SECRET_VERSION##*/}"
 unset VALUE
+
+IFS= read -r -s -p "KAMIS API key: " VALUE; echo
+KAMIS_API_KEY_VERSION="$(printf %s "$VALUE" | gcloud secrets versions add \
+  cityfarmerplus-kamis-api-key --data-file=- --format='value(name)')"
+KAMIS_API_KEY_VERSION="${KAMIS_API_KEY_VERSION##*/}"
+unset VALUE
 ```
 
 기존 로그인 token을 유지해야 한다면 운영 환경에서 사용 중인 JWT secret을 그대로 입력한다. 새 값으로 바꾸면 기존 로그인 token이 모두 무효가 된다. 새 version으로 회전할 때는 `versions add` → Cloud Run 참조 변경 → smoke test → 구 version disable 순서를 지킨다.
@@ -256,7 +278,8 @@ for SECRET in \
   cityfarmerplus-db-url \
   cityfarmerplus-db-username \
   cityfarmerplus-db-password \
-  cityfarmerplus-jwt-secret
+  cityfarmerplus-jwt-secret \
+  cityfarmerplus-kamis-api-key
 do
   gcloud secrets add-iam-policy-binding "$SECRET" \
     --member="serviceAccount:${RUNTIME_SA}" \
@@ -316,9 +339,9 @@ gcloud run deploy "$SERVICE" \
   --timeout=300 \
   --cpu-throttling \
   --env-vars-file=/tmp/cityfarmerplus-cloud-run.env.yaml \
-  --set-secrets="DB_URL=cityfarmerplus-db-url:${DB_URL_VERSION},DB_USERNAME=cityfarmerplus-db-username:${DB_USERNAME_VERSION},DB_PASSWORD=cityfarmerplus-db-password:${DB_PASSWORD_VERSION},JWT_SECRET=cityfarmerplus-jwt-secret:${JWT_SECRET_VERSION}" \
+  --set-secrets="DB_URL=cityfarmerplus-db-url:${DB_URL_VERSION},DB_USERNAME=cityfarmerplus-db-username:${DB_USERNAME_VERSION},DB_PASSWORD=cityfarmerplus-db-password:${DB_PASSWORD_VERSION},JWT_SECRET=cityfarmerplus-jwt-secret:${JWT_SECRET_VERSION},KAMIS_API_KEY=cityfarmerplus-kamis-api-key:${KAMIS_API_KEY_VERSION}" \
   --startup-probe="httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=0,failureThreshold=24,timeoutSeconds=2,periodSeconds=10" \
-  --liveness-probe="httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=0,failureThreshold=3,timeoutSeconds=2,periodSeconds=30"
+  --liveness-probe="httpGet.path=/health/live,httpGet.port=8080,initialDelaySeconds=0,failureThreshold=3,timeoutSeconds=2,periodSeconds=30"
 
 gcloud run services add-iam-policy-binding "$SERVICE" \
   --project="$PROJECT_ID" \
@@ -380,7 +403,7 @@ Cloud Build trigger는 GCP Console에서 다음 값으로 만든다.
 | `_SERVICE` | `cityfarmerplus-api` |
 | `_TAG` | `$SHORT_SHA` |
 | `_DEPLOY` | `true` |
-| `_CORS_ALLOWED_ORIGINS` | 로컬 연동 중에는 `http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000`, 프론트 배포 후에는 실제 Origin 목록 |
+| `_CORS_ALLOWED_ORIGINS` | `https://cityfarmerplus.site,https://www.cityfarmerplus.site`와 필요한 로컬 개발 Origin 목록 |
 
 Trigger 위치와 배포 위치는 서로 다르다. Trigger는 별도 private pool이 필요 없는 `global` 기본 pool에서 실행하고, `_REGION=us-west1`을 통해 Artifact Registry와 Cloud Run은 `us-west1`에 배포한다.
 
@@ -398,7 +421,7 @@ GitHub 연결과 IAM 변경을 마친 뒤 `main` push로 한 번 실행하고, �
 
 운영 배포를 완료한 뒤 다음을 모두 통과해야 한다.
 
-1. `GET /health`가 `200`을 반환한다.
+1. `GET /health`가 `200`과 `{ "status": "UP", "database": "UP" }`을 반환한다.
 2. 회원가입·로그인·JWT 인증 요청이 성공한다.
 3. DB 쓰기 후 다시 조회해 외부 MySQL 연결을 확인한다.
 4. 교육 또는 농가 증빙 파일을 업로드하고 다운로드한다.
@@ -407,6 +430,8 @@ GitHub 연결과 IAM 변경을 마친 뒤 `main` push로 한 번 실행하고, �
 7. 허용 Origin에는 CORS 헤더가 있고, 허용하지 않은 Origin에는 없다.
 8. 로그에 DB 비밀번호, JWT secret, access token이 노출되지 않는다.
 9. 프론트엔드 API base URL을 새 `run.app` 주소로 바꾼다.
+
+KAMIS secret이 Cloud Run에 연결돼 있다는 사실만으로 시세 API가 동작하는 것은 아니다. KAMIS가 요구하는 요청자 ID를 확보하고, 애플리케이션의 HTTP client·응답 DTO·오류/timeout 정책·프론트용 API와 테스트를 구현한 뒤 별도 smoke test를 통과해야 완료로 판정한다.
 
 JWT secret 또는 issuer를 바꾸면 기존 토큰은 무효가 되므로 사용자는 다시 로그인해야 한다.
 
@@ -418,7 +443,7 @@ JWT secret 또는 issuer를 바꾸면 기존 토큰은 무효가 되므로 사�
 - 현재 Spring Boot 런타임은 512MiB에서 메모리 한도를 초과했으므로 운영 기준을 2GiB로 유지한다. 이 설정은 1 vCPU의 요청 기반 무료 CPU·RAM 할당량을 약 50시간의 활성 시간까지 균형 있게 사용한다.
 - 외부 MySQL의 IP allowlist가 고정 IP만 허용하면 Cloud Run에서 연결되지 않을 수 있다.
 - 현재 Aiven 무료 MySQL은 장기간 활동이 없으면 자동으로 꺼질 수 있다. 이 경우 GCP 리소스가 정상이어도 애플리케이션 기동 시 DB DNS/연결 오류로 `5xx`가 발생한다.
-- 장애 확인 순서는 Aiven 서비스 `Running` 확인 → 공개 DNS/포트 확인 → `GET /api/education/courses`처럼 DB를 읽는 API 확인이다. `/health`만으로는 DB 연결을 증명할 수 없다.
+- 장애 확인 순서는 `/health`의 `database` 상태 확인 → Aiven 서비스 `Running` 확인 → 공개 DNS/포트 확인 → `GET /api/education/courses`처럼 실제 도메인 조회 API 확인이다. `/health/live`는 DB 연결을 증명하지 않는다.
 - `DB_POOL_INITIALIZATION_FAIL_TIMEOUT=60000`은 DB를 켠 직후의 짧은 DNS·연결 지연을 흡수하지만, 꺼진 Aiven 서비스를 대신 켜 주지는 않는다.
 - 운영 외부 MySQL은 백업과 스키마 비교 후 처음부터 `JPA_DDL_AUTO=validate`로 연결한다. 변경이 필요하면 복제 DB에서 검증한 migration을 명시적으로 적용한다.
 - 전용 Artifact Registry cleanup policy는 최신 version 하나만 보존하고 나머지를 비동기로 삭제한다.

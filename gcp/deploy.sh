@@ -13,7 +13,7 @@ BUILD_SA_RESOURCE="projects/${PROJECT_ID}/serviceAccounts/${BUILD_SA}"
 GCS_BUCKET="${PROJECT_ID}-cityfarmerplus-private"
 BUILD_SOURCE_BUCKET="${PROJECT_ID}-cityfarmerplus-build-source"
 JWT_ISSUER="${JWT_ISSUER:-https://api.cityfarmerplus.local}"
-CORS_ALLOWED_ORIGINS="${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000}"
+CORS_ALLOWED_ORIGINS="${CORS_ALLOWED_ORIGINS:-https://cityfarmerplus.site,https://www.cityfarmerplus.site,http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 
@@ -55,6 +55,7 @@ DB_URL_VERSION="$(latest_enabled_version cityfarmerplus-db-url)"
 DB_USERNAME_VERSION="$(latest_enabled_version cityfarmerplus-db-username)"
 DB_PASSWORD_VERSION="$(latest_enabled_version cityfarmerplus-db-password)"
 JWT_SECRET_VERSION="$(latest_enabled_version cityfarmerplus-jwt-secret)"
+KAMIS_API_KEY_VERSION="$(latest_enabled_version cityfarmerplus-kamis-api-key)"
 
 COMMIT_SHA="$(git rev-parse HEAD)"
 SHORT_SHA="$(git rev-parse --short=7 HEAD)"
@@ -102,9 +103,9 @@ gcloud run deploy "${SERVICE}" \
   --timeout=300 \
   --cpu-throttling \
   --env-vars-file="${ENV_FILE}" \
-  --set-secrets="DB_URL=cityfarmerplus-db-url:${DB_URL_VERSION},DB_USERNAME=cityfarmerplus-db-username:${DB_USERNAME_VERSION},DB_PASSWORD=cityfarmerplus-db-password:${DB_PASSWORD_VERSION},JWT_SECRET=cityfarmerplus-jwt-secret:${JWT_SECRET_VERSION}" \
+  --set-secrets="DB_URL=cityfarmerplus-db-url:${DB_URL_VERSION},DB_USERNAME=cityfarmerplus-db-username:${DB_USERNAME_VERSION},DB_PASSWORD=cityfarmerplus-db-password:${DB_PASSWORD_VERSION},JWT_SECRET=cityfarmerplus-jwt-secret:${JWT_SECRET_VERSION},KAMIS_API_KEY=cityfarmerplus-kamis-api-key:${KAMIS_API_KEY_VERSION}" \
   --startup-probe="httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=0,failureThreshold=24,timeoutSeconds=2,periodSeconds=10" \
-  --liveness-probe="httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=0,failureThreshold=3,timeoutSeconds=2,periodSeconds=30"
+  --liveness-probe="httpGet.path=/health/live,httpGet.port=8080,initialDelaySeconds=0,failureThreshold=3,timeoutSeconds=2,periodSeconds=30"
 
 gcloud run services add-iam-policy-binding "${SERVICE}" \
   --project="${PROJECT_ID}" \

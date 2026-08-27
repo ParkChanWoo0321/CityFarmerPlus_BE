@@ -102,6 +102,8 @@ public interface WorkAssignmentRepository extends JpaRepository<WorkAssignment, 
 
     Page<WorkAssignment> findByFarmProfileId(Long farmProfileId, Pageable pageable);
 
+    Page<WorkAssignment> findByStatus(WorkAssignment.WorkStatus status, Pageable pageable);
+
     List<WorkAssignment> findByJobPostingIdOrderByCreatedAtAsc(Long jobPostingId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -128,6 +130,24 @@ public interface WorkAssignmentRepository extends JpaRepository<WorkAssignment, 
               and assignment.endTime > :startTime
             """)
     long countOverlappingAssignments(
+            @Param("urbanFarmerId") Long urbanFarmerId,
+            @Param("workDate") LocalDate workDate,
+            @Param("startTime") LocalTime startTime,
+            @Param("endTime") LocalTime endTime
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select assignment
+            from WorkAssignment assignment
+            where assignment.urbanFarmer.id = :urbanFarmerId
+              and assignment.workDate = :workDate
+              and assignment.status <> chungbuk.cityfarmerplus.work.entity.WorkAssignment.WorkStatus.CANCELLED
+              and assignment.startTime < :endTime
+              and assignment.endTime > :startTime
+            order by assignment.id
+            """)
+    List<WorkAssignment> findOverlappingAssignmentsForUpdate(
             @Param("urbanFarmerId") Long urbanFarmerId,
             @Param("workDate") LocalDate workDate,
             @Param("startTime") LocalTime startTime,

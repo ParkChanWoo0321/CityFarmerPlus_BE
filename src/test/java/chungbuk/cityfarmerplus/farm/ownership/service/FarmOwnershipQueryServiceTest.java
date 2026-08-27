@@ -120,6 +120,35 @@ class FarmOwnershipQueryServiceTest {
         verifyNoInteractions(documentRepository, fileStorage);
     }
 
+    @Test
+    void adminDownloadsDocumentOnlyThroughProfileScopedLookup() {
+        FarmOwnershipDocument document = document(profile(farmUser(1L)));
+        ByteArrayResource resource = new ByteArrayResource("proof".getBytes());
+        when(documentRepository.findByIdAndSubmissionFarmProfileId(300L, 100L))
+                .thenReturn(Optional.of(document));
+        when(fileStorage.load("private/key.pdf")).thenReturn(resource);
+
+        FarmOwnershipDocumentDownload download =
+                queryService.downloadForAdmin(100L, 300L);
+
+        assertThat(download.resource()).isSameAs(resource);
+        assertThat(download.originalFilename()).isEqualTo("토지대장.pdf");
+        verifyNoInteractions(userRepository);
+    }
+
+    @Test
+    void adminCannotDownloadDocumentFromAnotherFarmProfile() {
+        when(documentRepository.findByIdAndSubmissionFarmProfileId(300L, 100L))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> queryService.downloadForAdmin(100L, 300L))
+                .isInstanceOf(FarmOwnershipException.class)
+                .extracting("code")
+                .isEqualTo("OWNERSHIP_DOCUMENT_NOT_FOUND");
+
+        verifyNoInteractions(fileStorage, userRepository);
+    }
+
     private FarmOwnershipDocument document(FarmProfile profile) {
         return submission(profile, 1).getDocuments().get(0);
     }

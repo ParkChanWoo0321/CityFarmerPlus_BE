@@ -67,7 +67,14 @@ public class EducationSubmissionService {
                 documentValidator.validate(documents);
         List<StoredEducationDocument> stored = storeDocuments(userId, validated);
         try {
-            return transactionService.persist(userId, request, stored);
+            EducationSubmissionResponse response =
+                    transactionService.persist(userId, request, stored);
+            fileDeletionScheduler.deleteOnRollback(
+                    stored.stream()
+                            .map(StoredEducationDocument::storageKey)
+                            .toList()
+            );
+            return response;
         } catch (RuntimeException exception) {
             deleteWithRetry(stored);
             throw exception;
