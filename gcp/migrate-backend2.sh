@@ -17,7 +17,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-for required_command in gcloud mysql mysqldump gzip sha256sum git; do
+for required_command in gcloud mysql mysqldump gzip sha256sum git timeout; do
   if ! command -v "${required_command}" >/dev/null 2>&1; then
     printf 'Required command is missing: %s\n' "${required_command}" >&2
     exit 1
@@ -71,12 +71,14 @@ fi
 
 MYSQL_BASE_CONNECTION_ARGS=(
   --protocol=TCP
-  --connect-timeout=15
   -h "${DB_HOST}"
   -P "${DB_PORT}"
   -u "${DB_USER}"
 )
 MYSQL_CONNECTION_ARGS=("${MYSQL_BASE_CONNECTION_ARGS[@]}")
+if mysql --help 2>&1 | grep -q -- '--connect-timeout'; then
+  MYSQL_CONNECTION_ARGS+=(--connect-timeout=15)
+fi
 if mysql --help 2>&1 | grep -q -- '--ssl-mode'; then
   MYSQL_CONNECTION_ARGS+=(--ssl-mode=REQUIRED)
 elif mysql --help 2>&1 | grep -Eq '(^|[[:space:]])--ssl([=[:space:]]|$)'; then
@@ -121,7 +123,7 @@ if mysqldump --help 2>&1 | grep -q -- '--no-tablespaces'; then
   DUMP_ARGS+=(--no-tablespaces)
 fi
 
-MYSQL_PWD="${DB_PASS}" mysqldump \
+MYSQL_PWD="${DB_PASS}" timeout --preserve-status 300 mysqldump \
   "${MYSQLDUMP_CONNECTION_ARGS[@]}" \
   "${DUMP_ARGS[@]}" \
   "${DB_NAME}" | gzip -9 >"${BACKUP_FILE}"
