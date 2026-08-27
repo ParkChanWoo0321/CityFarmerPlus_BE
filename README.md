@@ -69,8 +69,9 @@
 - 전체 API 목록: [API 명세 인덱스](docs/API_SPEC_INDEX.md)
 - 통합 계약: [전체 API 명세](docs/FULL_API_SPEC.md)
 - 노션 복사용 기능별 문서: [기능별 API 명세](docs/notion/README.md)
+- 교육 실시간 수강률: [교육 진도 API 명세](docs/EDUCATION_PROGRESS_API_SPEC.md)
 - GCP Cloud Run 배포: [GCP 배포 가이드](docs/GCP_DEPLOYMENT.md)
-- 2026-08-27 기준 HTTP 매핑 111개(사용자 API 67개 + 관리자 API 42개 + health 2개)를 코드와 문서에서 대조했습니다.
+- 2026-08-28 기준 HTTP 매핑 112개(사용자·공개·연동 API 68개 + 관리자 API 42개 + health 2개)를 코드와 문서에서 대조했습니다.
 
 검증 명령:
 
@@ -78,7 +79,7 @@
 .\gradlew.bat test --no-daemon --max-workers=1
 ```
 
-최신 전체 테스트 결과: **471건, 실패 0, 오류 0, 스킵 0**
+최신 전체 테스트 결과: **490건, 실패 0, 오류 0, 스킵 0**
 
 실제 MySQL의 비관적 잠금 쿼리와 UNIQUE 제약 계약은 일반 `test`에서 제외하고, 환경변수 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`를 설정한 뒤 다음 opt-in task로 검증합니다. 대상 스키마는 애플리케이션 엔티티와 일치해야 하며 `ddl-auto=validate`만 사용합니다.
 

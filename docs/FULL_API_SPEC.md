@@ -1,13 +1,13 @@
 # CityFarmerPlus 전체 API 명세
 
-- 문서 기준일: 2026-08-27
+- 문서 기준일: 2026-08-28
 - 기준: 현재 저장소의 Controller, DTO, Security, Service 상태 검증 코드
-- 현재 HTTP 작업 수: 111개 (사용자 API 67개 + 관리자 API 42개 + health 2개)
+- 현재 HTTP 작업 수: 112개 (사용자·공개·연동 API 68개 + 관리자 API 42개 + health 2개)
 - 로컬 기본 URL: http://localhost:8080
 - 운영 URL: https://cityfarmerplus-api-82951616760.us-west1.run.app
 - 시간 기준: 별도 표기가 없는 업무 시간 검증은 Asia/Seoul
 
-이 문서는 노션과 프론트엔드 연동에 그대로 사용할 수 있는 현재 백엔드 통합 계약이다. 사용자 API 67개, 관리자·내부 발급 API 42개, health 2개를 모두 포함한다. 기능별 상세 예시와 운영 설명은 `API_SPEC_INDEX.md`가 연결하는 개별 문서를 함께 참고하되, 실제 HTTP method/path의 정본은 이 문서다. 구현 예정 기능은 현재 기능처럼 적지 않는다.
+이 문서는 노션과 프론트엔드 연동에 그대로 사용할 수 있는 현재 백엔드 통합 계약이다. 사용자·공개·연동 API 68개, 관리자·내부 발급 API 42개, health 2개를 모두 포함한다. 기능별 상세 예시와 운영 설명은 `API_SPEC_INDEX.md`가 연결하는 개별 문서를 함께 참고하되, 실제 HTTP method/path의 정본은 이 문서다. 구현 예정 기능은 현재 기능처럼 적지 않는다.
 
 ---
 
@@ -50,6 +50,7 @@ Authorization: Bearer {{accessToken}}
 | GET | /health |
 | GET | /health/live |
 | POST | /api/internal/center-admins (provisioning key가 설정된 동안만) |
+| POST | /api/integrations/education/progress-events (HMAC 서명 필요) |
 | OPTIONS | /** |
 
 위 표 이외의 API는 Bearer JWT가 필요하다. 공개 공고 조회는 JWT 없이 호출할 수 있고, 유효한 JWT를 함께 보내면 현재 사용자의 지원 정보가 응답에 추가된다. 공개 API라도 잘못된 Bearer JWT를 보내면 401을 반환한다.
@@ -383,7 +384,7 @@ EducationCertificationResponse 핵심:
 | eligibleToApply | 공고 지원 가능 여부 |
 | requiredCourseCount | 현재 활성 필수 과정 수 |
 | approvedRequiredCourseCount | 승인 완료한 필수 과정 수 |
-| courses | 활성 과정별 최신 제출 상태와 반려 사유 |
+| courses | 활성 과정별 최신 제출 상태와 실시간 수강 시간·수강률 |
 | recognizedHours | 승인된 필수 과정 인정시간 합계 |
 
 활성 필수 과정이 한 개 이상 존재하고 모든 활성 필수 과정의 최신 제출이 승인되어야 eligibleToApply=true다. 인정시간은 과정 필수 시간 이상이고 제출한 completionHours를 초과할 수 없다.
@@ -400,6 +401,24 @@ REJECTED → 새 attempt로 재제출 가능
 과거 제출과 파일 메타데이터는 새 회차와 분리되어 보존된다.
 
 APPROVED, REJECTED와 reviewedByUserId, reviewedAt, recognizedHours, rejectionReason은 관리자 심사 API가 관리한다. 관리자 목록·상세·승인·반려·제출 범위 증빙 다운로드 계약은 `ADMIN_EDUCATION_SUBMISSION_API_SPEC.md`를 따른다.
+
+### 5.3 교육기관 실시간 진도 연동
+
+| 기능 | Method | URL | 권한 | Content-Type | 성공 |
+|---|---|---|---|---|---|
+| 과정별 수강 진도 이벤트 | POST | /api/integrations/education/progress-events | HMAC 서명 | application/json | 200 |
+
+요청 본문은 `provider`, `eventId`, `externalEnrollmentId`, `urbanFarmerId`,
+`courseId`, `totalMinutes`, `completedMinutes`, `occurredAt`을 받는다. 서명은
+`HMAC-SHA256(EDUCATION_PROGRESS_WEBHOOK_SECRET, timestamp + "." + rawBody)`이고
+헤더는 `X-Education-Event-Timestamp`, `X-Education-Signature: sha256=...`다.
+기본 서명 시각 허용 오차는 5분이다.
+
+과정별 사용자 응답에는 `progressStatus`, `totalMinutes`, `completedMinutes`,
+`remainingMinutes`, `progressPercentage`, `startedAt`, `completedAt`,
+`progressUpdatedAt`, `lastSyncedAt`이 포함된다. 이벤트 ID는 멱등 처리하고 과거
+이벤트는 감사 이력만 저장하며, 진도 감소와 완료 상태 회귀는 거절한다. 수강률은 화면
+표시용이며 이수증 관리자 승인과 `eligibleToApply` 판정을 자동 변경하지 않는다.
 
 ---
 

@@ -1,9 +1,9 @@
 # CityFarmerPlus 기능별 API 명세서
 
-- 기준일: 2026-08-27
+- 기준일: 2026-08-28
 - 기준: 현재 `main` 통합 구현 코드
-- 전체 HTTP API: 111개 (`OPTIONS` preflight 제외)
-- 이 폴더의 사용자 API 문서: 67개. 관리자 42개와 health 2개는 아래 별도 문서 참조
+- 전체 HTTP API: 112개 (`OPTIONS` preflight 제외)
+- 이 폴더의 사용자·공개·연동 API 문서: 68개. 관리자 42개와 health 2개는 아래 별도 문서 참조
 
 각 문서는 다른 문서 없이도 노션 페이지 하나에 그대로 복사할 수 있도록 작성했다.
 
@@ -17,7 +17,7 @@
 | 3 | 희망 근무 조건 | 3 | [03_WORK_PREFERENCE.md](03_WORK_PREFERENCE.md) |
 | 4 | 사업참여 신청 | 7 | [04_PARTICIPATION_APPLICATION.md](04_PARTICIPATION_APPLICATION.md) |
 | 4A | 통합 사업참여 신청 폼 | 3 | [04A_PARTICIPATION_FORM.md](04A_PARTICIPATION_FORM.md) |
-| 5 | 교육 과정·교육 인증 | 6 | [05_EDUCATION.md](05_EDUCATION.md) |
+| 5 | 교육 과정·교육 인증·진도 연동 | 7 | [05_EDUCATION.md](05_EDUCATION.md) |
 | 6 | 농가 프로필 | 3 | [06_FARM_PROFILE.md](06_FARM_PROFILE.md) |
 | 7 | 농가 소유 증빙 | 4 | [07_FARM_OWNERSHIP.md](07_FARM_OWNERSHIP.md) |
 | 8 | AI 공고 미리보기 | 1 | [08_AI_JOB_POSTING.md](08_AI_JOB_POSTING.md) |
@@ -29,7 +29,7 @@
 | 14 | 자주 묻는 질문 | 1 | [14_FAQ.md](14_FAQ.md) |
 | 15 | AI 행정 상담 | 2 | [15_AI_SUPPORT.md](15_AI_SUPPORT.md) |
 | 16 | KAMIS 최근 조사 가격 | 1 | [16_MARKET_PRICE.md](16_MARKET_PRICE.md) |
-|  | **합계** | **67** |  |
+|  | **합계** | **68** |  |
 
 관리자 API는 저장소 `docs` 루트의 다음 문서를 노션에 각각 복사한다.
 
@@ -56,4 +56,4 @@
 - 이 폴더의 00~16 문서는 사용자 API만 다루며, 구현된 `/api/admin/**` 42개는 위 8개 관리자 전용 명세가 정본이다.
 - `CENTER_ADMIN`과 승인·반려 상태는 통합 코드에서 실제 관리자 API로 처리한다.
 - 소셜 로그인, 알림, 정산·CSV, 결제 기능은 확정 제외 범위다.
-- 이 인덱스는 2026-08-27 통합 코드의 문서 분할 구조를 반영한다. 이후 API 변경 시 관련 사용자 또는 관리자 명세를 함께 갱신한다.
+- 이 인덱스는 2026-08-28 통합 코드의 문서 분할 구조를 반영한다. 이후 API 변경 시 관련 사용자 또는 관리자 명세를 함께 갱신한다.

@@ -1,7 +1,7 @@
 # CityFarmerPlus 사용자 API 요약 명세
 
-- 기준일: 2026-08-27
-- 사용자 HTTP 작업 수: 67개 (전체 111개 중 관리자 42개와 health 2개는 `API_SPEC_INDEX.md`의 별도 명세 참조)
+- 기준일: 2026-08-28
+- 사용자·공개·연동 HTTP 작업 수: 68개 (전체 112개 중 관리자 42개와 health 2개는 `API_SPEC_INDEX.md`의 별도 명세 참조)
 - 기준 코드: 현재 Controller·DTO·Security·Service
 - 상세 필드·오류·상태 규칙: [FULL_API_SPEC.md](FULL_API_SPEC.md)
 
@@ -29,7 +29,7 @@ http://localhost:8080
 Authorization: Bearer {{accessToken}}
 ```
 
-인증 없이 호출 가능한 API는 회원가입, 아이디 확인, 로그인, 활성 교육 과정 조회, 공개 공고 목록·상세, FAQ, KAMIS 최근 조사 가격, health와 최초 담당자 발급 API다. 최초 담당자 발급 API는 별도 provisioning key가 설정된 동안만 사용할 수 있다. 그 외 API는 JWT가 필요하다. 공고 조회에 유효한 JWT를 선택적으로 보내면 현재 사용자의 지원 정보가 포함된다.
+인증 없이 호출 가능한 API는 회원가입, 아이디 확인, 로그인, 활성 교육 과정 조회, 공개 공고 목록·상세, FAQ, KAMIS 최근 조사 가격, health와 최초 담당자 발급 API다. 최초 담당자 발급 API는 별도 provisioning key가 설정된 동안만 사용할 수 있다. 교육기관 진도 이벤트는 사용자 JWT 대신 HMAC 서명이 필요하다. 그 외 API는 JWT가 필요하다. 공고 조회에 유효한 JWT를 선택적으로 보내면 현재 사용자의 지원 정보가 포함된다.
 
 JSON 오류 형식:
 
@@ -73,7 +73,8 @@ JSON 오류 형식:
 | 로그인 사용자 공통 | 6 |
 | 도시농부 전용 | 29 |
 | 농가 전용 | 24 |
-| 합계 | **67** |
+| 교육기관 HMAC 연동 | 1 |
+| 합계 | **68** |
 
 ---
 
@@ -166,7 +167,7 @@ JSON 오류 형식:
 
 ---
 
-# 기능 4. 교육 과정·교육 인증 — 6개
+# 기능 4. 교육 과정·교육 인증·진도 연동 — 7개
 
 | 기능 | Method | URL | 권한 | 성공 |
 |---|---|---|---|---|
@@ -176,8 +177,9 @@ JSON 오류 형식:
 | 이수증 제출 | `POST` | `/api/urban-farmers/me/education-certification/submissions` | `URBAN_FARMER` | `201` |
 | 제출 상세 | `GET` | `/api/urban-farmers/me/education-certification/submissions/{submissionId}` | `URBAN_FARMER` | `200` |
 | 내 파일 다운로드 | `GET` | `/api/urban-farmers/me/education-certification/submissions/{submissionId}/documents/{documentId}` | `URBAN_FARMER` | `200` |
+| 교육기관 진도 이벤트 | `POST` | `/api/integrations/education/progress-events` | HMAC 서명 | `200` |
 
-제출은 `multipart/form-data`이며 `request` JSON과 `documents` 1~5개를 보낸다. 활성 필수 과정이 한 개 이상 존재하고 각 과정의 최신 제출이 모두 `APPROVED`여야 공고 지원이 가능하다. 교육 심사와 관리자 증빙 다운로드는 관리자 전용 명세를 따른다.
+제출은 `multipart/form-data`이며 `request` JSON과 `documents` 1~5개를 보낸다. 교육기관 이벤트가 들어오면 인증 진행률 응답의 수강 시간·잔여 시간·퍼센트가 갱신된다. 활성 필수 과정이 한 개 이상 존재하고 각 과정의 최신 제출이 모두 `APPROVED`여야 공고 지원이 가능하다. 수강률 100%만으로 지원 자격을 자동 부여하지 않으며, 교육 심사와 관리자 증빙 다운로드는 관리자 전용 명세를 따른다.
 
 ---
 

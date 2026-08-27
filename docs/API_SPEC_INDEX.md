@@ -1,19 +1,20 @@
 # CityFarmerPlus API 명세 인덱스
 
-- 문서 버전: 4.0
-- 갱신일: 2026-08-27
+- 문서 버전: 4.1
+- 갱신일: 2026-08-28
 - 기준: 현재 `main` 통합 코드의 Controller·DTO·Validation·Security·Service·Exception
-- 현재 HTTP 작업 수: 111개 (`OPTIONS` preflight 제외, 메서드 매핑 기준)
+- 현재 HTTP 작업 수: 112개 (`OPTIONS` preflight 제외, 메서드 매핑 기준)
 
 ## 1. 기준 문서
 
 | 문서 | 용도 | 현황 |
 |---|---|---|
-| [FULL_API_SPEC.md](FULL_API_SPEC.md) | 전체 111개 API 통합 계약 | 사용자 67 + 관리자·내부 발급 42 + health 2의 method/path 정본 |
+| [FULL_API_SPEC.md](FULL_API_SPEC.md) | 전체 112개 API 통합 계약 | 사용자·공개·연동 68 + 관리자·내부 발급 42 + health 2의 method/path 정본 |
 | [AUTH_API_SPEC.md](AUTH_API_SPEC.md) | 회원가입, JWT, 내 정보, 탈퇴 | 현재 코드 반영 |
 | [FARM_PROFILE_API_SPEC.md](FARM_PROFILE_API_SPEC.md) | 농가 프로필 생성·조회·수정 | 현재 코드 반영 |
 | [FARM_OWNERSHIP_SUBMISSION_API_SPEC.md](FARM_OWNERSHIP_SUBMISSION_API_SPEC.md) | 농가 소유 증빙 제출·이력·파일 조회 | 현재 코드 반영 |
 | [MARKET_PRICE_API_SPEC.md](MARKET_PRICE_API_SPEC.md) | KAMIS 최근 조사 가격 조회 | 현재 코드 반영 |
+| [EDUCATION_PROGRESS_API_SPEC.md](EDUCATION_PROGRESS_API_SPEC.md) | 교육기관 HMAC 진도 이벤트와 도시농부 수강률 조회 | feature 구현 반영 |
 | [NOTION_API_SPEC.md](NOTION_API_SPEC.md) | 노션 복사용 사용자 API 요약본 | 사용자 화면용 축약본 |
 | [notion/04A_PARTICIPATION_FORM.md](notion/04A_PARTICIPATION_FORM.md) | 디자인 한 화면용 통합 신청 폼 3 API | 현재 코드 반영 |
 | [notion/10_PUBLIC_JOB_POSTING.md](notion/10_PUBLIC_JOB_POSTING.md) | 모집 중·마감 공고 검색과 내 지원 요약 | 현재 코드 반영 |
@@ -33,11 +34,11 @@
 
 | 코드 영역 | HTTP 작업 수 |
 |---|---:|
-| 사용자·공개 API | 67 |
+| 사용자·공개·연동 API | 68 |
 | `/api/admin/**` CENTER_ADMIN API | 41 |
 | 내부 담당자 발급 API | 1 |
 | health | 2 |
-| 합계 | **111** |
+| 합계 | **112** |
 
 기능별 집계:
 
@@ -45,7 +46,7 @@
 |---|---:|---|
 | 인증·회원 | 7 | 회원가입, 로그인, 내 정보, 수정, 탈퇴, 로그아웃 |
 | 도시농부 프로필·희망 근무 조건·사업참여 | 16 | 프로필 3, 근무 조건 3, 사업참여 7, 통합 신청 폼 3 |
-| 교육 과정·교육 인증 | 6 | 공개 과정 1, 제출·진행률 5 |
+| 교육 과정·교육 인증·진도 연동 | 7 | 공개 과정 1, 제출·진행률 5, HMAC 진도 이벤트 1 |
 | 농가 프로필·소유 증빙 | 7 | 프로필 3, 제출·이력·다운로드 4 |
 | 모집 공고·AI 초안 | 13 | AI 1, 농가 공고 10, 공고 조회 2 |
 | 공고 지원·농가 의견 | 6 | 지원 4, 농가 후보 의견 2 |
@@ -55,7 +56,7 @@
 | 농산물 가격 | 1 | KAMIS 최근 조사 가격 조회 |
 | health | 2 | readiness(`/health`), liveness(`/health/live`) |
 | 관리자 | 42 | 계정 발급, 대시보드, 심사, 과정, 공고·매칭, 출결 정정, 대리 접수 |
-| 합계 | **111** | Controller 메서드 매핑 기준 |
+| 합계 | **112** | Controller 메서드 매핑 기준 |
 
 ## 3. 인증 기준
 
@@ -72,6 +73,7 @@
 - `GET /health`
 - `GET /health/live`
 - `POST /api/internal/center-admins` (provisioning key가 설정된 동안만)
+- `POST /api/integrations/education/progress-events` (사용자 JWT 대신 HMAC 서명 필요)
 - 모든 경로의 `OPTIONS` preflight
 
 그 외 API에는 다음 헤더가 필요하다.
