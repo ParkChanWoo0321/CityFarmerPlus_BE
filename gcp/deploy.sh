@@ -104,21 +104,99 @@ gcloud builds submit . \
   --substitutions="BRANCH_NAME=main,_REGION=${REGION},_REPOSITORY=${REPOSITORY},_IMAGE=${SERVICE},_SERVICE=${SERVICE},_TAG=${SHORT_SHA},_DEPLOY=false"
 
 IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${SERVICE}:${SHORT_SHA}"
-current_traffic_revision() {
+DEPLOY_LOCK_URI="gs://${BUILD_SOURCE_BUCKET}/deploy-locks/${SERVICE}.lock"
+DEPLOY_LOCK_OWNER="manual:${COMMIT_SHA}:$(date -u +'%s%N'):$$"
+DEPLOY_LOCK_GENERATION=""
+
+release_deploy_lock() {
+  if [[ -n "${DEPLOY_LOCK_GENERATION}" ]]; then
+    gcloud storage rm "${DEPLOY_LOCK_URI}" \
+      --if-generation-match="${DEPLOY_LOCK_GENERATION}" \
+      --project="${PROJECT_ID}" \
+      --quiet || echo "Deployment lock ${DEPLOY_LOCK_URI} could not be released." >&2
+  fi
+}
+
+acquire_deploy_lock() {
+  if ! printf '%s\n' "${DEPLOY_LOCK_OWNER}" | gcloud storage cp - "${DEPLOY_LOCK_URI}" \
+    --if-generation-match=0 \
+    --project="${PROJECT_ID}" \
+    --quiet; then
+    echo "Another deployment holds ${DEPLOY_LOCK_URI}; production traffic was not changed." >&2
+    return 1
+  fi
+  if ! DEPLOY_LOCK_GENERATION="$(gcloud storage objects describe "${DEPLOY_LOCK_URI}" \
+    --project="${PROJECT_ID}" \
+    --format='value(generation)')" || \
+    [[ ! "${DEPLOY_LOCK_GENERATION}" =~ ^[0-9]+$ ]]; then
+    echo "Deployment lock generation could not be resolved; the lock was left in place and production traffic was not changed." >&2
+    DEPLOY_LOCK_GENERATION=""
+    return 1
+  fi
+  trap 'rm -f "${ENV_FILE}"; release_deploy_lock' EXIT
+}
+
+service_traffic_json() {
   gcloud run services describe "${SERVICE}" \
     --project="${PROJECT_ID}" \
     --region="${REGION}" \
-    --flatten='status.traffic[]' \
-    --filter='status.traffic.percent=100' \
-    --format='value(status.traffic.revisionName)'
+    --format=json
 }
 
-PREVIOUS_REVISION="$(current_traffic_revision)"
+current_traffic_revision() {
+  service_traffic_json | python3 -c '
+import json
+import sys
+
+traffic = json.load(sys.stdin).get("status", {}).get("traffic", [])
+matches = [entry.get("revisionName", "") for entry in traffic
+           if entry.get("percent") == 100]
+print(matches[0] if len(matches) == 1 else "")
+'
+}
+
+resolve_current_traffic_revision() {
+  local attempt
+  local revision
+  for attempt in 1 2 3; do
+    revision=""
+    if revision="$(current_traffic_revision)" && [[ -n "${revision}" ]]; then
+      printf '%s' "${revision}"
+      return 0
+    fi
+    if [[ "${attempt}" -lt 3 ]]; then
+      sleep 2
+    fi
+  done
+  return 1
+}
+
+tagged_traffic_pair() {
+  local tag="$1"
+  service_traffic_json | python3 -c '
+import json
+import sys
+
+tag = sys.argv[1]
+traffic = json.load(sys.stdin).get("status", {}).get("traffic", [])
+matches = [(entry.get("revisionName", ""), entry.get("url", ""))
+           for entry in traffic
+           if entry.get("tag") == tag]
+if len(matches) == 1 and all(matches[0]):
+    print(*matches[0], sep="\t")
+' "${tag}"
+}
+
+acquire_deploy_lock
+PREVIOUS_REVISION=""
+if ! PREVIOUS_REVISION="$(resolve_current_traffic_revision)"; then
+  PREVIOUS_REVISION=""
+fi
 if [[ -z "${PREVIOUS_REVISION}" ]]; then
   echo 'An existing Cloud Run service with one 100% production revision is required.' >&2
   exit 1
 fi
-CANDIDATE_TAG="candidate-${SHORT_SHA}-$(date -u +'%H%M%S')"
+CANDIDATE_TAG="candidate-${SHORT_SHA}-$(date -u +'%s%N')"
 
 gcloud run deploy "${SERVICE}" \
   --project="${PROJECT_ID}" \
@@ -142,24 +220,11 @@ gcloud run deploy "${SERVICE}" \
   --startup-probe="httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=0,failureThreshold=24,timeoutSeconds=2,periodSeconds=10" \
   --liveness-probe="httpGet.path=/health/live,httpGet.port=8080,initialDelaySeconds=0,failureThreshold=3,timeoutSeconds=2,periodSeconds=30"
 
-CANDIDATE_REVISION=""
-if ! CANDIDATE_REVISION="$(gcloud run services describe "${SERVICE}" \
-  --project="${PROJECT_ID}" \
-  --region="${REGION}" \
-  --flatten='status.traffic[]' \
-  --filter="status.traffic.tag=${CANDIDATE_TAG}" \
-  --format='value(status.traffic.revisionName)')"; then
-  CANDIDATE_REVISION=""
+CANDIDATE_TRAFFIC=""
+if ! CANDIDATE_TRAFFIC="$(tagged_traffic_pair "${CANDIDATE_TAG}")"; then
+  CANDIDATE_TRAFFIC=""
 fi
-CANDIDATE_URL=""
-if ! CANDIDATE_URL="$(gcloud run services describe "${SERVICE}" \
-  --project="${PROJECT_ID}" \
-  --region="${REGION}" \
-  --flatten='status.traffic[]' \
-  --filter="status.traffic.tag=${CANDIDATE_TAG}" \
-  --format='value(status.traffic.url)')"; then
-  CANDIDATE_URL=""
-fi
+IFS=$'\t' read -r CANDIDATE_REVISION CANDIDATE_URL <<<"${CANDIDATE_TRAFFIC}"
 
 if [[ -z "${CANDIDATE_REVISION}" || -z "${CANDIDATE_URL}" ]]; then
   echo 'Candidate revision or tagged URL could not be resolved; production traffic was not changed.' >&2
@@ -206,15 +271,20 @@ TRAFFIC_SWITCHED=false
 rollback_and_exit() {
   local exit_code="$1"
   local current_revision
+  local restored_revision
   local rollback_succeeded=false
   local rollback_owner_changed=false
   trap - ERR INT TERM
   set +e
-  current_revision="$(current_traffic_revision)"
+  if ! current_revision="$(resolve_current_traffic_revision)"; then
+    current_revision=""
+  fi
   if [[ "${current_revision}" == "${CANDIDATE_REVISION}" ]]; then
     echo "Deployment failed after traffic change; rolling back to ${PREVIOUS_REVISION}." >&2
     for attempt in 1 2 3; do
-      current_revision="$(current_traffic_revision)"
+      if ! current_revision="$(resolve_current_traffic_revision)"; then
+        current_revision=""
+      fi
       if [[ "${current_revision}" != "${CANDIDATE_REVISION}" ]]; then
         if [[ "${current_revision}" == "${PREVIOUS_REVISION}" ]]; then
           rollback_succeeded=true
@@ -231,7 +301,9 @@ rollback_and_exit() {
         --region="${REGION}" \
         --to-revisions="${PREVIOUS_REVISION}=100" \
         --quiet
-      if [[ "$(current_traffic_revision)" == "${PREVIOUS_REVISION}" ]]; then
+      restored_revision=""
+      if restored_revision="$(resolve_current_traffic_revision)" && \
+        [[ "${restored_revision}" == "${PREVIOUS_REVISION}" ]]; then
         rollback_succeeded=true
         break
       fi
@@ -258,11 +330,22 @@ rollback_and_exit() {
   exit "${exit_code}"
 }
 CURRENT_REVISION=""
-if ! CURRENT_REVISION="$(current_traffic_revision)"; then
+if ! CURRENT_REVISION="$(resolve_current_traffic_revision)"; then
   CURRENT_REVISION=""
 fi
 if [[ "${CURRENT_REVISION}" != "${PREVIOUS_REVISION}" ]]; then
   echo "Production traffic changed from ${PREVIOUS_REVISION} to ${CURRENT_REVISION}; this candidate was not promoted." >&2
+  gcloud run services update-traffic "${SERVICE}" \
+    --project="${PROJECT_ID}" \
+    --region="${REGION}" \
+    --remove-tags="${CANDIDATE_TAG}" \
+    --quiet || true
+  exit 1
+fi
+CURRENT_CANDIDATE_TRAFFIC=""
+if ! CURRENT_CANDIDATE_TRAFFIC="$(tagged_traffic_pair "${CANDIDATE_TAG}")" || \
+  [[ "${CURRENT_CANDIDATE_TRAFFIC}" != "${CANDIDATE_TRAFFIC}" ]]; then
+  echo 'Candidate tag mapping changed before promotion; production traffic was not changed.' >&2
   gcloud run services update-traffic "${SERVICE}" \
     --project="${PROJECT_ID}" \
     --region="${REGION}" \
