@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -43,5 +44,24 @@ class JobPostingAccessServiceTest {
 
         assertThat(result).isSameAs(farmProfile);
         verify(farmProfile, never()).getStatus();
+    }
+
+    @Test
+    void ownershipApprovalIsStillRequiredForCandidateAndWorkManagement() {
+        when(userRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(farmOwner));
+        when(farmOwner.isActive()).thenReturn(true);
+        when(farmOwner.getUserType()).thenReturn(User.UserType.FARM);
+        when(farmProfileRepository.findByOwnerIdForUpdate(1L))
+                .thenReturn(Optional.of(farmProfile));
+        when(farmProfile.getStatus()).thenReturn(FarmProfile.FarmProfileStatus.DRAFT);
+
+        JobPostingAccessService service = new JobPostingAccessService(
+                userRepository,
+                farmProfileRepository
+        );
+
+        assertThatThrownBy(() -> service.requireApprovedFarmForUpdate(1L))
+                .extracting("code")
+                .isEqualTo("FARM_APPROVAL_REQUIRED");
     }
 }
