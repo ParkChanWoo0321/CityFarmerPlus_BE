@@ -36,21 +36,17 @@ CityFarmerPlus Backend
 
 ## 백엔드 아키텍처
 
-도메인별 패키지를 가진 **단일 Spring Boot 애플리케이션**입니다. 아래 그림은 저장소의 Cloud Run 배포 구성을 기준으로 주요 연결만 표시했습니다.
+도메인별 패키지를 가진 **단일 Spring Boot 애플리케이션**입니다. 아래 그림은 Cloud Run 배포 구성의 요청 처리·저장 경로입니다.
 
 ```mermaid
 flowchart TB
-    client["도시농부 · 농가 · 중개센터"]
-    lms["외부 교육 시스템"]
+    client["클라이언트"]
     api["Cloud Run · Spring Boot"]
-    db[("MySQL")]
+    db[("외부 MySQL")]
     files[("GCS")]
-    kamis["KAMIS API"]
     client -->|"HTTPS · JWT"| api
-    lms -.->|"진도 웹훅 · HMAC"| api
     api -->|"JPA"| db
     api -->|"파일 저장"| files
-    api -.->|"시세 조회"| kamis
 ```
 
 | 구성 | 처리 내용 |
@@ -58,10 +54,27 @@ flowchart TB
 | 인증·요청 처리 | Spring Security에서 JWT와 활성 계정을 확인하고 Controller에서 요청 검증 |
 | 업무·영속성 | Service의 트랜잭션, Entity·정책 클래스의 상태 검증, JPA·MySQL의 잠금과 제약조건 |
 | 파일 | 배포 설정은 GCS 사용. `FileStorage`로 Local·GCS·S3 호환 구현체 선택 |
-| 외부 연동 | 교육 진도 웹훅 수신·서명 검증, KAMIS 시세 조회·메모리 캐시 |
+| 교육 연동 | 외부 시스템의 진도 웹훅 수신·HMAC 서명 검증 |
+| 시세 연동 | KAMIS API 조회·메모리 캐시·이전 성공값 제공 |
 | 비밀값 | Secret Manager에서 DB·JWT 등의 설정을 환경변수로 주입 |
 
-교육 시스템 연결은 구현된 웹훅 수신 계약을 나타냅니다. `open-in-view=false`로 설정하고 서비스 계층에서 응답 DTO를 구성합니다.
+`open-in-view=false`로 설정하고 서비스 계층에서 응답 DTO를 구성합니다.
+
+<details>
+<summary>외부 시스템 연동 경로</summary>
+
+```mermaid
+flowchart TB
+    education["외부 교육 시스템"]
+    backend["Spring Boot"]
+    kamis["KAMIS API"]
+    education -.->|"진도 웹훅 · HMAC"| backend
+    backend -.->|"시세 조회 · HTTPS"| kamis
+```
+
+교육 시스템 연결은 구현된 웹훅 수신 계약을 나타냅니다. 수신한 진도는 DB에 저장하고, KAMIS 응답은 인스턴스 메모리에 캐시합니다.
+
+</details>
 
 [의존성](build.gradle) · [설정](src/main/resources/application.properties) · [파일 저장소](src/main/java/chungbuk/cityfarmerplus/common/storage/FileStorageConfig.java)
 
