@@ -6,60 +6,45 @@ CityFarmerPlus Backend
 
 > 도시농부플러스 서비스 로고 사진
 
-[제13회 전국 ICT융합 AI 공모전](https://linkareer.com/activity/330182)에 참가한 4인 팀 프로젝트입니다. ICT 기술로 지역 문제와 주민 생활의 불편을 해결한다는 공모 취지에 맞춰, 충북형 도시농부 사업의 신청·심사·매칭 과정을 서비스로 구현했습니다.
+[제13회 전국 ICT융합 AI 공모전](https://linkareer.com/activity/330182)에 참가한 4인 팀 프로젝트입니다. 지역 문제 해결이라는 공모 취지에 맞춰 충북형 도시농부 사업의 신청·심사·매칭 과정을 구현했습니다. 도시농부는 교육 인증 후 공고에 지원하고, 농가는 지원자 의견과 출결을 관리하며, 중개센터는 심사와 최종 매칭을 담당합니다.
 
 | 구분 | 내용 |
 |---|---|
 | 팀 구성 | 디자인 1명 · 프론트엔드 1명 · 백엔드 2명 |
-| 참여 역할 | 백엔드 개발자 2명 중 1명. 두 개발자가 이 저장소를 공동 사용 |
+| 참여 역할 | 백엔드 개발자 2명 중 1명. 사용자 API·외부 연동 구현, 관리자 기능 통합·보강, 배포 구성 |
 | 주요 기술 | Java 17 · Spring Boot 4.1.0 · Spring Security · JPA · MySQL |
 | 배포 구성 | Docker · Cloud Build · Cloud Run · GCS |
 
-본인 담당 기능은 커밋·PR 근거와 함께 구분했습니다. 이후 구현 범위·아키텍처·핵심 설계는 백엔드 팀이 함께 완성한 시스템을 설명합니다.
-
-[본인 담당](#본인-담당-기능) · [구현 범위](#백엔드-구현-범위) · [아키텍처](#백엔드-아키텍처) · [핵심 설계](#핵심-설계와-문제-해결) · [ERD](#데이터-모델과-erd) · [협업](#협업-방식) · [검증](#테스트와-검증) · [실행](#로컬-실행)
+[본인 담당](#본인-담당-기능) · [아키텍처](#백엔드-아키텍처) · [문제 해결](#핵심-설계와-문제-해결) · [ERD](#데이터-모델과-erd) · [협업](#협업-방식) · [배포](#배포와-운영) · [검증](#테스트와-검증) · [실행](#로컬-실행)
 
 ## 본인 담당 기능
 
-아래는 `ParkChanWoo0321` 작성 커밋의 실제 코드 변경과 PR에 포함된 커밋을 대조해 정리한 담당 범위입니다. 기능을 새로 구현한 작업과 팀원 구현을 통합·보강한 작업을 구분했습니다.
+백엔드 개발자 2명이 이 저장소를 함께 사용했습니다. 아래는 `ParkChanWoo0321` 작성 커밋의 실제 코드 변경으로 확인한 제 구현·수정 범위이며, 아키텍처와 ERD는 팀이 함께 완성한 시스템을 나타냅니다.
 
-| 영역 | 담당한 구현·수정과 근거 |
+| 담당 영역 | 주요 작업 |
 |---|---|
-| 계정 상태·탈퇴 | JWT 검증 이후 DB의 활성 여부·역할을 확인하는 필터와 회원 탈퇴 시 도메인 데이터 정리를 구현했습니다. [활성 계정 검증](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/8a25ebdb65aaf83b4440b8d9059cd00e2b23c70c) · [회원 탈퇴](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/fc99b9687e0c0939f8a38c5c46205eca1d77e9f5) |
-| 도시농부 통합 신청 | 프로필·근무 선호·연도별 참여 신청을 한 요청으로 저장·제출하는 API를 구현했습니다. 사용자·관련 데이터 잠금과 요청에 전달된 예상 버전 검사를 적용했습니다. [통합 신청 구현](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/46c177b01a4bba1290c1204b495c613f149a4c78) |
-| 농가 모집·지원·근무 | 농가용 공고 관리, 도시농부 지원·취소, 농가 의견, 확정 근무 조건의 스냅샷과 출결·완료 처리를 구현했습니다. [공고 관리](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/e3cfe732321b9b925e5755b9d81a0dc5b19164a2) · [지원·농가 의견](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/8f130aa7b00f5d36e0c555e2c3442f8b58343ac7) · [근무 관리](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/a470e10b4417f9d96474ab8c58e8a3b1488de8e7) |
-| 교육 이수증·파일 복구 | 교육 과정 조회·이수증 제출·파일 검증·지원 자격 계산을 구현했습니다. 삭제 재시도 작업과 일반 이수증 제출 실패의 보상 삭제를 추가했습니다. [파일 삭제 재시도](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/22f33d5e169fd0cfa174787f6ead17e15a3725fd) · [이수증 제출](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/08b0228dfa2977e84b5125c2995ed843d9d3e293) |
-| 외부 교육 진도 | HMAC 웹훅, 수강·이벤트 모델, 중복 본문 비교와 진도 역전 검증을 구현했습니다. 테스트·API 명세·DB 마이그레이션도 함께 추가했습니다. [PR #15](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/15) |
-| KAMIS 시세 | 공개 시세 조회 API에 타임아웃·재시도·메모리 캐시·이전 성공값 제공·동시 갱신 제어를 구현하고 테스트를 추가했습니다. [PR #9](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/9) |
-| 기존 관리자 기능 보강 | 팀원이 구현한 매칭에 도시농부 사용자 행 잠금과 관련 잠금 조회를 추가했습니다. 관리자 증빙 다운로드, 공통 목록 응답, 출결 정정 후 상태 처리도 보완했습니다. [PR #2](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/2) |
-| 배포·DB 변경 절차 | GCS 저장소와 Cloud Build·Cloud Run 배포 구성을 추가했습니다. 백업·체크섬·사전/사후 검사 실행기, 후보 검증·트래픽 소유권 확인·배포 잠금을 구현·보강했습니다. [GCP 배포 구성](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/4e8704c6367e289e3017e7eef3dad552952b37d8) · [PR #3](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/3) · [PR #11](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/11) |
-| API 연동·회귀 검증 | 배포 스모크에 CORS 사전 요청 검사를 추가했습니다. 농가 공고의 선택 필터 생략 오류를 수정하고 빈 목록·실제 공고 목록의 JPA 통합 테스트를 추가했습니다. [PR #17](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/17) · [PR #24](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/24) |
+| 사용자·농가 업무 API | 활성 계정 검증·탈퇴, 농가 공고, 지원·농가 의견, 근무 스냅샷·출결·완료 |
+| 통합 참여 신청 | 프로필·근무 선호·연도별 신청의 저장·제출 API와 수정 충돌 검사 |
+| 교육 이수증·파일 | 과정 조회, 이수증 검증·제출·자격 계산, 실패 파일 삭제 재시도 |
+| 외부 시스템 연동 | 교육 진도 HMAC 웹훅, KAMIS 시세 API·캐시·장애 대응 |
+| 기존 관리자 기능 보강 | 팀원 매칭의 동시성 보강, 증빙 다운로드, 목록 응답·상태 처리 보완 |
+| 배포·통합 검증 | GCS·Cloud Run 구성, DB 마이그레이션·검증 스크립트, 후보 배포 검증·롤백, CORS·회귀 테스트 |
 
 <details>
-<summary>그 밖의 구현 기록과 공동 작업의 구분</summary>
+<summary>담당 기능의 커밋·PR 근거와 공동 작업 범위</summary>
 
-추가로 [농가 소유 증빙 제출·조회](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/b28968e53f541437b5d657585f42d51eaed053d7), [도시농부·농가 대시보드](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/fb0553469d50359ee3510f1ed0c17bfda434337d), [규칙 기반 공고 문안](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/500626417883193fc1983bbbc9ca90d44c5f38bd), [키워드 기반 상담](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/83c81ec6c62866cec3193d5be3ea1bf9b43c72f5) 구현 기록이 있습니다.
+- 계정: [활성 계정 검증](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/8a25ebdb65aaf83b4440b8d9059cd00e2b23c70c) · [회원 탈퇴](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/fc99b9687e0c0939f8a38c5c46205eca1d77e9f5)
+- 사용자 업무: [통합 신청](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/46c177b01a4bba1290c1204b495c613f149a4c78) · [농가 공고](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/e3cfe732321b9b925e5755b9d81a0dc5b19164a2) · [지원·농가 의견](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/8f130aa7b00f5d36e0c555e2c3442f8b58343ac7) · [근무 관리](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/a470e10b4417f9d96474ab8c58e8a3b1488de8e7)
+- 파일·교육: [삭제 재시도](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/22f33d5e169fd0cfa174787f6ead17e15a3725fd) · [이수증 제출](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/08b0228dfa2977e84b5125c2995ed843d9d3e293) · [농가 증빙 제출](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/b28968e53f541437b5d657585f42d51eaed053d7)
+- 외부 연동: [교육 진도 PR #15](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/15) · [KAMIS PR #9](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/9)
+- 통합·운영: [관리자 보강 PR #2](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/2) · [GCP 배포 구성](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/4e8704c6367e289e3017e7eef3dad552952b37d8) · [DB 마이그레이션·검증 스크립트 PR #3](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/3) · [배포 잠금 PR #11](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/11) · [CORS 검사 PR #17](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/17)
+- 기타: [도시농부·농가 대시보드](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/fb0553469d50359ee3510f1ed0c17bfda434337d) · [규칙 기반 공고 문안](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/500626417883193fc1983bbbc9ca90d44c5f38bd) · [키워드 기반 상담](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/83c81ec6c62866cec3193d5be3ea1bf9b43c72f5)
 
-로그인/JWT와 도시농부 프로필은 두 개발자의 초기 구현 및 중복 경로를 정리한 [병합 이력](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/234dce26824ef43925a9333841a6e36a153109df)이 있어 최초 단독 구현으로 표시하지 않았습니다. 중개센터 심사·매칭 확정·출결 정정·대리 접수는 팀원의 초기 구현을 포함하며, 제 담당 범위는 [PR #1](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/1)의 통합과 [PR #2](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/2) 등에 기록된 기능 추가·안정화입니다.
+로그인/JWT와 도시농부 프로필에는 두 개발자의 초기 구현 및 [중복 경로 병합 이력](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/234dce26824ef43925a9333841a6e36a153109df)이 있어 최초 단독 구현으로 표시하지 않았습니다. 관리자 심사·매칭 확정·출결 정정·대리 접수는 팀원의 초기 구현을 포함하며, 저는 [관리자 기능 통합 PR #1](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/1)과 이후 기능 추가·안정화에 참여했습니다. 기록으로 확인되지 않는 설계 주도권이나 기여율은 기재하지 않았습니다.
 
-커밋·PR로 확인할 수 없는 설계 주도권, 페어 프로그래밍 여부와 개인 기여율은 기재하지 않았습니다.
+공고 문안·작업 안내는 `RULE_BASED_V1`, 상담은 키워드 규칙을 사용합니다. 외부 LLM, 결제·정산, 알림·푸시는 구현 범위에 포함하지 않습니다.
 
 </details>
-
-## 백엔드 구현 범위
-
-도시농부는 교육 인증 후 공고에 지원하고, 농가는 지원자에게 선호 의견을 남깁니다. 중개센터는 심사 결과와 근무 조건을 확인해 매칭을 확정합니다. 백엔드는 역할·소유권·업무 상태를 검사해 각 단계에서 가능한 작업을 제한합니다.
-
-| 영역 | 구현 내용 |
-|---|---|
-| 인증·인가 | JWT·BCrypt, 역할·소유권 검사, 탈퇴 계정의 기존 토큰 차단 |
-| 도시농부 | 프로필·근무 선호·참여 신청, 교육 이수증 제출, 공고 지원·취소 |
-| 농가 | 프로필·소유 증빙, 모집 공고 관리, 지원자 의견, 출결·근무 완료 |
-| 중개센터 | 참여·교육·농가·공고 심사, 최종 매칭, 출결 정정, 대리 접수·감사 이력 |
-| 외부 연동 | 교육 진도 웹훅, KAMIS 시세 조회, Local/GCS/S3 파일 저장 |
-| 배포 구성 | Docker, Cloud Build, Cloud Run, 마이그레이션·스모크 검사·롤백 스크립트 |
-
-공고 문안과 작업 안내는 `RULE_BASED_V1`, 상담은 키워드 규칙으로 생성합니다. 외부 LLM 연동은 없으며, 결제·정산과 알림·푸시는 구현 범위에 포함하지 않습니다.
 
 ## 백엔드 아키텍처
 
@@ -78,11 +63,9 @@ flowchart TB
 
 | 구성 | 처리 내용 |
 |---|---|
-| 인증·요청 처리 | Spring Security에서 JWT와 활성 계정을 확인하고 Controller에서 요청 검증 |
+| 인증·요청 처리 | Spring Security의 JWT·활성 계정 검사, BCrypt 비밀번호 해시, Controller의 요청 검증 |
 | 업무·영속성 | Service의 트랜잭션, Entity·정책 클래스의 상태 검증, JPA·MySQL의 잠금과 제약조건 |
 | 파일 | 배포 설정은 GCS 사용. `FileStorage`로 Local·GCS·S3 호환 구현체 선택 |
-| 교육 연동 | 외부 시스템의 진도 웹훅 수신·HMAC 서명 검증 |
-| 시세 연동 | KAMIS API 조회·메모리 캐시·이전 성공값 제공 |
 | 비밀값 | Secret Manager에서 DB·JWT 등의 설정을 환경변수로 주입 |
 
 `open-in-view=false`로 설정하고 서비스 계층에서 응답 DTO를 구성합니다.
@@ -99,7 +82,7 @@ flowchart TB
     backend -.->|"시세 조회 · HTTPS"| kamis
 ```
 
-교육 시스템 연결은 구현된 웹훅 수신 계약을 나타냅니다. 수신한 진도는 DB에 저장하고, KAMIS 응답은 인스턴스 메모리에 캐시합니다.
+교육 시스템 연결은 구현된 웹훅 수신 계약을 나타냅니다.
 
 </details>
 
@@ -107,11 +90,49 @@ flowchart TB
 
 ## 핵심 설계와 문제 해결
 
-### 1. 동시 매칭의 정원·시간 중복 제어
+### 1. 통합 신청의 원자적 저장과 수정 충돌 검사
 
-팀원의 기존 매칭 구현에 사용자 행 잠금과 관련 잠금 조회를 추가한 사례입니다. 아래는 보강 후의 처리 흐름입니다.
+‘희망 근무 조건 신청’ 화면은 프로필·근무 선호·연도별 신청을 함께 다룹니다. 일부 데이터만 저장되는 상황을 막기 위해 세 데이터를 같은 트랜잭션으로 저장·제출하는 통합 API를 구현했습니다. 클라이언트가 예상 버전을 보내면 각 데이터의 현재 버전과 비교해 오래된 화면의 수정 요청을 거절합니다. 예상 버전이 생략된 항목은 이 비교를 수행하지 않습니다.
 
-같은 공고에 대한 동시 요청은 정원을 초과할 수 있고, 서로 다른 공고의 요청은 같은 도시농부를 겹치는 시간에 배정할 수 있습니다.
+[화면 연동 계약](docs/notion/04A_PARTICIPATION_FORM.md) · [통합 신청 저장](src/main/java/chungbuk/cityfarmerplus/urbanfarmer/participation/service/ParticipationFormService.java)
+
+### 2. 파일 업로드와 DB 저장 사이의 실패 복구
+
+이수증 파일 저장 후 DB 처리가 실패하면 파일만 남을 수 있습니다. 일반 제출 경로에 삭제 작업을 별도 트랜잭션으로 기록하고 재시도하는 보상 처리를 구현했습니다.
+
+| 단계 | 처리 |
+|---|---|
+| 검증 | 확장자·MIME·실제 헤더·크기 검사, 저장 결과의 크기·SHA-256 대조 |
+| DB 저장 | 잠금 상태에서 제출 조건을 다시 확인하고 제출 내역 저장 |
+| 실패 보상 | `REQUIRES_NEW`로 삭제 작업을 기록한 뒤 즉시 삭제 시도 |
+| 재시도 | 최대 100건씩 잠금 조회. 실패 작업의 다음 시도 대기시간을 30초~1시간으로 증가 |
+| 탈퇴 처리 | DB 트랜잭션에 삭제 작업을 기록하고 커밋 이후 파일 삭제 |
+
+다운로드는 소유자·담당자 권한을 검사합니다. 삭제 재시도는 작업이 DB에 기록된 이후를 대상으로 하며, 농가 증빙과 대리 접수의 후속 롤백에는 즉시 삭제만 수행하는 경로가 남아 있습니다.
+
+[교육 파일 제출](src/main/java/chungbuk/cityfarmerplus/education/service/EducationSubmissionService.java) · [보상 삭제](src/main/java/chungbuk/cityfarmerplus/common/storage/FileDeletionScheduler.java) · [재시도 워커](src/main/java/chungbuk/cityfarmerplus/common/storage/FileDeletionWorker.java)
+
+### 3. 교육 웹훅의 위변조·중복·순서 역전 검증
+
+교육 진도 수신 API에 `timestamp + "." + raw body`의 HMAC-SHA256 서명 검증과 기본 ±5분의 시각 허용 범위를 적용했습니다. 이미 저장된 제공자·이벤트 ID를 다시 수신하면 본문 해시를 비교합니다. 내용이 같으면 해당 수강의 현재 정보를 반환하고, 다르면 충돌 처리합니다.
+
+과거 이벤트는 이력에 남기되 현재 진도를 덮어쓰지 않습니다. 더 최신 이벤트라도 수강 시간 감소나 완료 상태의 되돌림은 거부합니다. 현재 진도와 수신 이력을 별도 테이블에 저장하고 적용 여부를 기록합니다. 동시 중복 저장은 UNIQUE 제약으로 제한합니다.
+
+수강률과 교육 이수 승인은 별개입니다. 공고 지원 자격은 활성 필수 과정의 최신 이수증 심사 결과와 인정 시간으로 계산합니다.
+
+[서명 검증](src/main/java/chungbuk/cityfarmerplus/education/progress/security/EducationProgressWebhookVerifier.java) · [이벤트 처리](src/main/java/chungbuk/cityfarmerplus/education/progress/service/EducationProgressEventService.java) · [교육 자격 계산](src/main/java/chungbuk/cityfarmerplus/education/service/EducationCertificationProgressCalculator.java)
+
+### 4. 외부 시세 API 장애 대응
+
+KAMIS 호출 지연·실패에 대응하도록 시세 조회 API에 타임아웃과 메모리 캐시를 구현했습니다. 연결 제한은 2초, 호출 시도당 응답 제한은 5초이며 일시적 장애에는 한 번 재시도합니다. 정상 캐시는 1시간 유지하고, 갱신 실패 시 마지막 성공값을 수집 시점부터 최대 24시간까지 제공합니다. 이때 응답의 `stale=true`로 이전 값임을 알립니다.
+
+`AtomicBoolean`으로 인스턴스 내 한 요청만 캐시를 갱신하게 하고, 실패 후 30초 동안 추가 호출을 제한합니다. 갱신이 진행 중이거나 실패한 상황에서 제공 가능한 캐시도 없으면 오류를 반환합니다. 캐시와 갱신 제어의 범위는 인스턴스 하나입니다.
+
+[시세 서비스](src/main/java/chungbuk/cityfarmerplus/marketprice/service/MarketPriceService.java) · [캐시·동시 갱신 테스트](src/test/java/chungbuk/cityfarmerplus/marketprice/service/MarketPriceServiceTest.java)
+
+### 5. 기존 매칭 기능의 동시성 보강
+
+팀원의 기존 매칭 구현에 도시농부 사용자 행 잠금과 관련 잠금 조회를 추가했습니다. 서로 다른 공고의 요청이 같은 사람을 겹치는 시간에 배정하는 상황을 제어하기 위한 변경입니다.
 
 `AdminJobPostingMatchingService`는 하나의 트랜잭션에서 **공고 → 지원 → 도시농부 사용자 행**을 잠근 뒤 정원과 기존 근무 시간을 확인합니다. 사용자 행을 공통 잠금 대상으로 두어 아직 근무 배정이 없는 경우에도 동일인의 매칭 요청을 직렬화합니다. 여러 행을 잠그는 지원·사용자 쿼리는 ID 순으로 조회합니다.
 
@@ -139,59 +160,9 @@ sequenceDiagram
 
 [매칭 서비스](src/main/java/chungbuk/cityfarmerplus/admin/jobposting/service/AdminJobPostingMatchingService.java) · [중복 시간 쿼리](src/main/java/chungbuk/cityfarmerplus/work/repository/WorkAssignmentRepository.java) · [사용자 잠금 선행 호출 테스트](src/test/java/chungbuk/cityfarmerplus/admin/jobposting/service/AdminJobPostingMatchingServiceLockTest.java)
 
-### 2. 신청 데이터의 원자적 저장과 근무 조건 보존
-
-통합 신청서는 프로필·근무 선호·연도별 신청서를 같은 트랜잭션에서 저장합니다. 클라이언트가 예상 버전을 보내면 각 데이터의 현재 버전과 비교해 오래된 화면의 수정 요청을 거절합니다. 예상 버전이 생략된 항목은 이 비교를 수행하지 않습니다.
-
-매칭 시에는 농가 정보, 작업일·시간, 집결 장소, 임금, 준비물 등을 `WorkAssignment`에 스냅샷으로 저장합니다. 이후 공고가 수정되어도 확정 당시의 조건을 조회할 수 있습니다. 출결 정정은 담당자만 수행하고 이전·변경 상태, 사유와 처리자를 이력으로 남깁니다.
-
-[통합 신청 저장](src/main/java/chungbuk/cityfarmerplus/urbanfarmer/participation/service/ParticipationFormService.java) · [근무 스냅샷](src/main/java/chungbuk/cityfarmerplus/work/entity/WorkAssignment.java) · [출결 정정](src/main/java/chungbuk/cityfarmerplus/admin/work/service/AdminWorkAssignmentService.java)
-
-### 3. 파일 업로드와 DB 저장 사이의 실패 복구
-
-이수증 파일을 업로드한 뒤 DB 저장이 실패하면 파일만 남을 수 있습니다. 일반 교육 이수증 제출은 파일을 먼저 저장하고 DB 트랜잭션에서 제출 내역을 확정합니다. 이 경로에서 실패하면 삭제 작업을 기록해 보상 삭제를 시도합니다.
-
-| 단계 | 처리 |
-|---|---|
-| 검증 | 확장자·MIME·실제 헤더·크기 검사, 저장 결과의 크기·SHA-256 대조 |
-| DB 저장 | 잠금 상태에서 제출 조건을 다시 확인하고 제출 내역 저장 |
-| 실패 보상 | `REQUIRES_NEW`로 삭제 작업을 기록한 뒤 즉시 삭제 시도 |
-| 재시도 | 최대 100건씩 잠금 조회. 실패 작업의 다음 시도 대기시간을 30초~1시간으로 증가 |
-| 탈퇴 처리 | DB 트랜잭션에 삭제 작업을 기록하고 커밋 이후 파일 삭제 |
-
-다운로드는 소유자·담당자 권한을 검사합니다. 삭제 재시도는 작업이 DB에 기록된 이후를 대상으로 하며, 농가 증빙과 대리 접수의 후속 롤백에는 즉시 삭제만 수행하는 경로가 남아 있습니다.
-
-[교육 파일 제출](src/main/java/chungbuk/cityfarmerplus/education/service/EducationSubmissionService.java) · [보상 삭제](src/main/java/chungbuk/cityfarmerplus/common/storage/FileDeletionScheduler.java) · [재시도 워커](src/main/java/chungbuk/cityfarmerplus/common/storage/FileDeletionWorker.java)
-
-### 4. 교육 웹훅의 위변조·중복·순서 역전 검증
-
-외부 진도 이벤트는 `timestamp + "." + raw body`의 HMAC-SHA256 서명과 기본 ±5분의 시각 허용 범위를 검사합니다. 이미 저장된 제공자·이벤트 ID를 다시 수신하면 본문 해시를 비교합니다. 내용이 같으면 해당 수강의 현재 정보를 반환하고, 다르면 충돌 처리합니다.
-
-과거 이벤트는 이력에 남기되 현재 진도를 덮어쓰지 않습니다. 더 최신 이벤트라도 수강 시간 감소나 완료 상태의 되돌림은 거부합니다. 현재 진도와 수신 이력을 별도 테이블에 저장하고 적용 여부를 기록합니다. 동시 중복 저장은 UNIQUE 제약으로 제한합니다.
-
-수강률과 교육 이수 승인은 별개입니다. 공고 지원 자격은 활성 필수 과정의 최신 이수증 심사 결과와 인정 시간으로 계산합니다.
-
-[서명 검증](src/main/java/chungbuk/cityfarmerplus/education/progress/security/EducationProgressWebhookVerifier.java) · [이벤트 처리](src/main/java/chungbuk/cityfarmerplus/education/progress/service/EducationProgressEventService.java) · [교육 자격 계산](src/main/java/chungbuk/cityfarmerplus/education/service/EducationCertificationProgressCalculator.java)
-
-### 5. 외부 시세 API 장애 대응
-
-KAMIS 시세는 메모리 스냅샷으로 제공합니다. 연결 제한은 2초, 호출 시도당 응답 제한은 5초이며 일시적 장애에는 한 번 재시도합니다. 정상 캐시는 1시간 유지하고, 갱신 실패 시 마지막 성공값을 수집 시점부터 최대 24시간까지 제공합니다. 이때 응답의 `stale=true`로 이전 값임을 알립니다.
-
-`AtomicBoolean`으로 인스턴스 내 한 요청만 캐시를 갱신하게 하고, 실패 후 30초 동안 추가 호출을 제한합니다. 갱신이 진행 중이거나 실패한 상황에서 제공 가능한 캐시도 없으면 오류를 반환합니다. 캐시와 갱신 제어의 범위는 인스턴스 하나입니다.
-
-[시세 서비스](src/main/java/chungbuk/cityfarmerplus/marketprice/service/MarketPriceService.java) · [캐시·동시 갱신 테스트](src/test/java/chungbuk/cityfarmerplus/marketprice/service/MarketPriceServiceTest.java)
-
-### 6. 공고 목록의 반복 조회 줄이기
-
-공고 목록은 `@EntityGraph`로 농가·소유자 정보를 함께 조회합니다. 사용자의 지원 상태와 공고 심사 이력은 현재 페이지의 공고 ID 목록으로 일괄 조회해 응답에 조합합니다. 검색 조건은 JPA Specification으로 구성합니다.
-
-심사 이력은 페이지에 포함된 공고의 전체 이력을 가져온 뒤 최신 항목을 선택합니다. 공고별 최신 한 건만 조회하는 쿼리는 개선 과제로 남아 있으며, 성능 개선 수치는 측정하지 않았습니다.
-
-[공고 저장소](src/main/java/chungbuk/cityfarmerplus/jobposting/repository/JobPostingRepository.java) · [공개 목록](src/main/java/chungbuk/cityfarmerplus/jobposting/service/PublicJobPostingService.java) · [심사 이력 조합](src/main/java/chungbuk/cityfarmerplus/jobposting/service/JobPostingResponseAssembler.java)
-
 ## 데이터 모델과 ERD
 
-한 그림에서 긴 테이블명과 전체 컬럼을 읽지 않아도 되도록 업무별로 나눴습니다. 그림에는 짧은 이름과 핵심 컬럼을, 바로 아래에는 실제 테이블명을 적었습니다. `PK`는 기본키, `FK`는 외래키, `UK`는 단일 컬럼 UNIQUE입니다. 점선은 비식별 관계를 나타냅니다.
+그림에는 업무별 핵심 컬럼을, 아래 표에는 실제 테이블명을 표시했습니다. `PK`는 기본키, `FK`는 외래키, `UK`는 단일 컬럼 UNIQUE입니다. 점선은 비식별 관계를 나타냅니다.
 
 사용자·심사자 참조, 승인 제출 포인터와 컬렉션 테이블 등 일부 관계는 생략했습니다.
 
@@ -259,7 +230,7 @@ erDiagram
 | 근무 배정 | `work_assignments` |
 | 출결 정정 | `work_assignment_corrections` |
 
-근무 배정의 농가·공고 ID는 스냅샷용 일반 컬럼이며 JPA 외래키가 아닙니다. 확정 당시의 농가 정보·일시·임금 등을 함께 저장하고, 출결 정정은 이전 상태·변경 상태·사유·처리자를 별도 이력으로 남깁니다.
+[근무 배정](src/main/java/chungbuk/cityfarmerplus/work/entity/WorkAssignment.java)의 농가·공고 ID는 스냅샷용 일반 컬럼이며 JPA 외래키가 아닙니다. 확정 당시의 농가 정보·일시·임금 등을 함께 저장하고, [출결 정정](src/main/java/chungbuk/cityfarmerplus/admin/work/service/AdminWorkAssignmentService.java)은 이전 상태·변경 상태·사유·처리자를 별도 이력으로 남깁니다.
 
 <details>
 <summary>교육 이수증 심사 ERD</summary>
@@ -331,7 +302,7 @@ erDiagram
 | 수강 진도 | `education_enrollments` |
 | 진도 이벤트 | `education_progress_events` |
 
-수강 진도는 현재 상태를, 이벤트는 제공자·이벤트 ID·본문 해시·발생 시각·적용 여부를 기록합니다. 웹훅 진도와 이수증 승인에 따른 지원 자격은 별도로 관리합니다.
+수강의 현재 상태와 이벤트별 수신·적용 이력을 분리했습니다.
 
 </details>
 
@@ -357,32 +328,26 @@ erDiagram
 
 ## 협업 방식
 
-### 화면 요구사항을 API 계약으로 구체화
+### API 계약과 릴리스 기록
 
-화면 연동에 필요한 데이터·상태·오류를 API 계약으로 정리했습니다. [공통 계약](docs/notion/00_COMMON_CONTRACT.md)에 인증, 오류 형식, 페이지네이션, CORS를 모으고, [기능별 명세](docs/notion/README.md)에 요청·응답 예시, 권한, 상태 전이와 제한 사항을 기록했습니다.
+[공통 계약](docs/notion/00_COMMON_CONTRACT.md)에 인증·오류·페이지네이션·CORS를, [기능별 명세](docs/notion/README.md)에 요청·응답과 권한·상태 전이를 정리했습니다. 오류는 `code`·`message`, 페이지 목록은 `PageResponse` 형식으로 제공합니다.
 
-‘희망 근무 조건 신청’ 화면은 프로필·근무 선호·사업 참여 신청을 함께 다룹니다. [통합 신청 API](docs/notion/04A_PARTICIPATION_FORM.md)에 세 데이터의 저장·제출 계약과 예상 버전 전달 방식을 명시했습니다.
+교육 연동은 [기능 PR #15](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/15)에 코드·테스트·마이그레이션·배포 순서를 함께 기록하고 `develop`에 통합한 뒤, [릴리스 PR #16](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/16)으로 `main`에 반영했습니다.
 
-### 기능 개발과 릴리스를 PR로 구분
+### 오류 재현과 회귀 테스트
 
-교육 진도 연동과 공고 목록 오류 수정은 작업 브랜치에서 `develop`으로 통합한 뒤, 릴리스 PR으로 `main`에 반영했습니다.
+농가 공고 목록에서 `displayStatus`를 생략하면 400 오류가 발생했습니다. `null Specification` 결합 경로를 수정하고, 공고가 없는 농가와 공고가 있는 농가 모두 필터 없이 조회하는 JPA 통합 테스트를 추가했습니다. [수정 PR #24](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/24) · [릴리스 PR #25](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/25)
 
-교육 진도 연동의 [기능 PR #15](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/15)에는 API·명세·테스트와 DB 마이그레이션·배포 설정을 포함했습니다. PR 본문에 테스트 결과와 마이그레이션, 비밀값 주입, 후보 리비전 검증 순서를 기록했고, [릴리스 PR #16](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/16)으로 반영했습니다.
+<details>
+<summary>공통 인가와 목록 조회 구현</summary>
 
-### API 오류를 재현 조건과 회귀 테스트로 남김
+`URBAN_FARMER`, `FARM`, `CENTER_ADMIN`의 역할·소유권·업무 상태를 검사합니다. JWT 검증 이후에도 DB의 활성 여부와 역할을 확인하며, 담당자 계정은 별도 프로비저닝 키를 사용하는 API로 생성합니다.
 
-농가 공고 목록 API에서 `displayStatus`를 생략하면 400 오류가 발생한 사례가 있었습니다. 선택 필터가 없을 때 `null Specification`을 결합하는 경로를 수정하고, **공고가 없는 농가와 공고가 있는 농가** 모두 필터 없이 조회할 수 있는 통합 테스트를 추가했습니다.
+공고 목록은 `@EntityGraph`로 농가·소유자를 함께 조회하고, 사용자의 지원 상태·심사 이력은 페이지의 공고 ID로 일괄 조회합니다. 검색 조건은 JPA Specification으로 구성합니다. 심사 이력은 전체 이력을 가져온 뒤 최신 항목을 선택하며, 성능 개선 수치는 측정하지 않았습니다.
 
-수정은 [PR #24](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/24), 릴리스는 [PR #25](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/25)에 기록했습니다.
+[보안 설정](src/main/java/chungbuk/cityfarmerplus/auth/config/SecurityConfig.java) · [활성 계정 검증](src/main/java/chungbuk/cityfarmerplus/auth/config/ActiveAccountFilter.java) · [공고 저장소](src/main/java/chungbuk/cityfarmerplus/jobposting/repository/JobPostingRepository.java) · [공개 목록](src/main/java/chungbuk/cityfarmerplus/jobposting/service/PublicJobPostingService.java) · [심사 이력 조합](src/main/java/chungbuk/cityfarmerplus/jobposting/service/JobPostingResponseAssembler.java)
 
-## 인증과 API 계약
-
-- `URBAN_FARMER`, `FARM`, `CENTER_ADMIN`을 구분하고 역할·소유권·업무 상태를 검사합니다.
-- JWT 검증 뒤 DB의 활성 여부와 역할을 확인해 탈퇴한 계정의 기존 토큰을 차단합니다.
-- 담당자 계정은 별도 프로비저닝 키를 사용하는 내부 API로 생성합니다.
-- 오류는 `code`·`message`, 페이지 목록은 `PageResponse` 형식으로 제공합니다.
-
-[보안 설정](src/main/java/chungbuk/cityfarmerplus/auth/config/SecurityConfig.java) · [활성 계정 검증](src/main/java/chungbuk/cityfarmerplus/auth/config/ActiveAccountFilter.java) · [전체 API 명세](docs/FULL_API_SPEC.md)
+</details>
 
 ## 배포와 운영
 
@@ -521,7 +486,7 @@ src/main/java/chungbuk/cityfarmerplus
 
 </details>
 
-- [API 명세 인덱스](docs/API_SPEC_INDEX.md) / [기능별 명세](docs/notion/README.md)
+- [전체 API 명세](docs/FULL_API_SPEC.md) / [명세 인덱스](docs/API_SPEC_INDEX.md) / [기능별 명세](docs/notion/README.md)
 - [교육 진도 연동 계약](docs/EDUCATION_PROGRESS_API_SPEC.md)
 - [담당자 매칭 API](docs/ADMIN_JOB_POSTING_API_SPEC.md)
 - [근무 정정 API](docs/ADMIN_WORK_ASSIGNMENT_API_SPEC.md)
