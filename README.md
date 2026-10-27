@@ -15,9 +15,36 @@ CityFarmerPlus Backend
 | 주요 기술 | Java 17 · Spring Boot 4.1.0 · Spring Security · JPA · MySQL |
 | 배포 구성 | Docker · Cloud Build · Cloud Run · GCS |
 
-이 문서는 백엔드 팀의 공동 구현 내용을 다룹니다. 동시 매칭, 신청 데이터 일관성, 파일 실패 복구와 외부 이벤트 처리의 설계·검증 근거를 정리했습니다.
+본인 담당 기능은 커밋·PR 근거와 함께 구분했습니다. 이후 구현 범위·아키텍처·핵심 설계는 백엔드 팀이 함께 완성한 시스템을 설명합니다.
 
-[구현 범위](#백엔드-구현-범위) · [아키텍처](#백엔드-아키텍처) · [핵심 설계](#핵심-설계와-문제-해결) · [ERD](#데이터-모델과-erd) · [협업](#협업-방식) · [검증](#테스트와-검증) · [실행](#로컬-실행)
+[본인 담당](#본인-담당-기능) · [구현 범위](#백엔드-구현-범위) · [아키텍처](#백엔드-아키텍처) · [핵심 설계](#핵심-설계와-문제-해결) · [ERD](#데이터-모델과-erd) · [협업](#협업-방식) · [검증](#테스트와-검증) · [실행](#로컬-실행)
+
+## 본인 담당 기능
+
+아래는 `ParkChanWoo0321` 작성 커밋의 실제 코드 변경과 PR에 포함된 커밋을 대조해 정리한 담당 범위입니다. 기능을 새로 구현한 작업과 팀원 구현을 통합·보강한 작업을 구분했습니다.
+
+| 영역 | 담당한 구현·수정과 근거 |
+|---|---|
+| 계정 상태·탈퇴 | JWT 검증 이후 DB의 활성 여부·역할을 확인하는 필터와 회원 탈퇴 시 도메인 데이터 정리를 구현했습니다. [활성 계정 검증](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/8a25ebdb65aaf83b4440b8d9059cd00e2b23c70c) · [회원 탈퇴](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/fc99b9687e0c0939f8a38c5c46205eca1d77e9f5) |
+| 도시농부 통합 신청 | 프로필·근무 선호·연도별 참여 신청을 한 요청으로 저장·제출하는 API를 구현했습니다. 사용자·관련 데이터 잠금과 요청에 전달된 예상 버전 검사를 적용했습니다. [통합 신청 구현](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/46c177b01a4bba1290c1204b495c613f149a4c78) |
+| 농가 모집·지원·근무 | 농가용 공고 관리, 도시농부 지원·취소, 농가 의견, 확정 근무 조건의 스냅샷과 출결·완료 처리를 구현했습니다. [공고 관리](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/e3cfe732321b9b925e5755b9d81a0dc5b19164a2) · [지원·농가 의견](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/8f130aa7b00f5d36e0c555e2c3442f8b58343ac7) · [근무 관리](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/a470e10b4417f9d96474ab8c58e8a3b1488de8e7) |
+| 교육 이수증·파일 복구 | 교육 과정 조회·이수증 제출·파일 검증·지원 자격 계산을 구현했습니다. 삭제 재시도 작업과 일반 이수증 제출 실패의 보상 삭제를 추가했습니다. [파일 삭제 재시도](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/22f33d5e169fd0cfa174787f6ead17e15a3725fd) · [이수증 제출](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/08b0228dfa2977e84b5125c2995ed843d9d3e293) |
+| 외부 교육 진도 | HMAC 웹훅, 수강·이벤트 모델, 중복 본문 비교와 진도 역전 검증을 구현했습니다. 테스트·API 명세·DB 마이그레이션도 함께 추가했습니다. [PR #15](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/15) |
+| KAMIS 시세 | 공개 시세 조회 API에 타임아웃·재시도·메모리 캐시·이전 성공값 제공·동시 갱신 제어를 구현하고 테스트를 추가했습니다. [PR #9](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/9) |
+| 기존 관리자 기능 보강 | 팀원이 구현한 매칭에 도시농부 사용자 행 잠금과 관련 잠금 조회를 추가했습니다. 관리자 증빙 다운로드, 공통 목록 응답, 출결 정정 후 상태 처리도 보완했습니다. [PR #2](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/2) |
+| 배포·DB 변경 절차 | GCS 저장소와 Cloud Build·Cloud Run 배포 구성을 추가했습니다. 백업·체크섬·사전/사후 검사 실행기, 후보 검증·트래픽 소유권 확인·배포 잠금을 구현·보강했습니다. [GCP 배포 구성](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/4e8704c6367e289e3017e7eef3dad552952b37d8) · [PR #3](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/3) · [PR #11](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/11) |
+| API 연동·회귀 검증 | 배포 스모크에 CORS 사전 요청 검사를 추가했습니다. 농가 공고의 선택 필터 생략 오류를 수정하고 빈 목록·실제 공고 목록의 JPA 통합 테스트를 추가했습니다. [PR #17](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/17) · [PR #24](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/24) |
+
+<details>
+<summary>그 밖의 구현 기록과 공동 작업의 구분</summary>
+
+추가로 [농가 소유 증빙 제출·조회](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/b28968e53f541437b5d657585f42d51eaed053d7), [도시농부·농가 대시보드](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/fb0553469d50359ee3510f1ed0c17bfda434337d), [규칙 기반 공고 문안](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/500626417883193fc1983bbbc9ca90d44c5f38bd), [키워드 기반 상담](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/83c81ec6c62866cec3193d5be3ea1bf9b43c72f5) 구현 기록이 있습니다.
+
+로그인/JWT와 도시농부 프로필은 두 개발자의 초기 구현 및 중복 경로를 정리한 [병합 이력](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/commit/234dce26824ef43925a9333841a6e36a153109df)이 있어 최초 단독 구현으로 표시하지 않았습니다. 중개센터 심사·매칭 확정·출결 정정·대리 접수는 팀원의 초기 구현을 포함하며, 제 담당 범위는 [PR #1](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/1)의 통합과 [PR #2](https://github.com/ParkChanWoo0321/CityFarmerPlus_BE/pull/2) 등에 기록된 기능 추가·안정화입니다.
+
+커밋·PR로 확인할 수 없는 설계 주도권, 페어 프로그래밍 여부와 개인 기여율은 기재하지 않았습니다.
+
+</details>
 
 ## 백엔드 구현 범위
 
@@ -81,6 +108,8 @@ flowchart TB
 ## 핵심 설계와 문제 해결
 
 ### 1. 동시 매칭의 정원·시간 중복 제어
+
+팀원의 기존 매칭 구현에 사용자 행 잠금과 관련 잠금 조회를 추가한 사례입니다. 아래는 보강 후의 처리 흐름입니다.
 
 같은 공고에 대한 동시 요청은 정원을 초과할 수 있고, 서로 다른 공고의 요청은 같은 도시농부를 겹치는 시간에 배정할 수 있습니다.
 
